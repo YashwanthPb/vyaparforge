@@ -82,20 +82,21 @@ export async function getInvoice(id: string) {
 
 export async function getPOsWithDispatches() {
   try {
+    // Find all non-cancelled POs that have at least one line item with qtyDispatched > 0
     const purchaseOrders = await prisma.purchaseOrder.findMany({
       where: {
         status: { not: "CANCELLED" },
-        outwardGatePasses: {
-          some: {},
+        lineItems: {
+          some: {
+            qtyDispatched: { gt: 0 },
+          },
         },
       },
       include: {
         division: { select: { name: true } },
         lineItems: {
+          where: { qtyDispatched: { gt: 0 } },
           include: {
-            outwardGatePasses: {
-              select: { qty: true },
-            },
             invoiceItems: {
               select: { qty: true },
             },
@@ -105,7 +106,7 @@ export async function getPOsWithDispatches() {
       orderBy: { createdAt: "desc" },
     });
 
-    console.log("[getPOsWithDispatches] Raw POs found:", purchaseOrders.length);
+    console.log("[getPOsWithDispatches] POs with dispatched items:", purchaseOrders.length);
 
     const result = purchaseOrders
       .map((po) => ({
@@ -114,10 +115,7 @@ export async function getPOsWithDispatches() {
         divisionName: po.division.name,
         lineItems: po.lineItems
           .map((item) => {
-            const totalDispatched = item.outwardGatePasses.reduce(
-              (sum, gp) => sum + Number(gp.qty),
-              0
-            );
+            const totalDispatched = Number(item.qtyDispatched);
             const alreadyInvoiced = item.invoiceItems.reduce(
               (sum, ii) => sum + Number(ii.qty),
               0
@@ -210,15 +208,11 @@ export async function createInvoice(data: {
         const lineItem = await tx.pOLineItem.findUniqueOrThrow({
           where: { id: item.poLineItemId },
           include: {
-            outwardGatePasses: { select: { qty: true } },
             invoiceItems: { select: { qty: true } },
           },
         });
 
-        const totalDispatched = lineItem.outwardGatePasses.reduce(
-          (sum, gp) => sum + Number(gp.qty),
-          0
-        );
+        const totalDispatched = Number(lineItem.qtyDispatched);
         const alreadyInvoiced = lineItem.invoiceItems.reduce(
           (sum, ii) => sum + Number(ii.qty),
           0

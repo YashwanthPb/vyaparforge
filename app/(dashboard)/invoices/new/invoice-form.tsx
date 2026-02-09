@@ -176,6 +176,23 @@ export function InvoiceForm({
     }
   }
 
+  if (purchaseOrders.length === 0) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center">
+          <p className="text-lg font-medium text-muted-foreground">
+            No purchase orders available for invoicing
+          </p>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Invoices can only be created for POs that have dispatched items
+            (outward gate passes). Create outward gate passes first, then return
+            here to generate invoices.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <Card>
