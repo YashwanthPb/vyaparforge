@@ -10,6 +10,7 @@ import {
   ArrowUpFromLine,
   Receipt,
   BookOpen,
+  BarChart3,
   Settings,
 } from "lucide-react";
 
@@ -57,6 +58,11 @@ const mainNavItems = [
     title: "PO Ledger",
     href: "/po-ledger",
     icon: BookOpen,
+  },
+  {
+    title: "Reports",
+    href: "/reports",
+    icon: BarChart3,
   },
 ];
 

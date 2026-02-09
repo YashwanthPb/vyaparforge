@@ -34,7 +34,9 @@
       "Bash(xargs kill:*)",
       "Bash(ls:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nVyaparForge v1.0 - Manufacturing ERP for HAL suppliers. Features: PO management, inward/outward gate passes with PO auto-linking, invoice generation with GST, PO ledger, reports with Excel export, authentication, division management.\nEOF\n\\)\")",
+      "Bash(git config:*)"
     ]
   }
 }
