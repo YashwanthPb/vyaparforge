@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma init:*)",
+      "Bash(npm install:*)",
+      "Bash(npx shadcn@latest init:*)",
+      "Bash(npx shadcn@latest add:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(if exist \"c:\\\\Users\\\\yashw\\\\vyaparforge\\\\app\\\\generated\" rmdir /s /q \"c:\\\\Users\\\\yashw\\\\vyaparforge\\\\app\\\\generated\")",
+      "Bash(npx prisma db push:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(del \"c:\\\\Users\\\\yashw\\\\vyaparforge\\\\nul\")",
+      "Bash(node -e:*)",
+      "Bash(npx tsx:*)",
+      "Bash(npm run dev)",
+      "Bash(curl:*)",
+      "Bash(npx tsc:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(move:*)",
+      "Bash(move \"app\\\\actions.ts\" \"app\\\\\\(dashboard\\)\\\\actions.ts\")",
+      "Bash(move \"app\\\\purchase-orders\" \"app\\\\\\(dashboard\\)\\\\purchase-orders\")",
+      "Bash(move \"app\\\\inward-gate-passes\" \"app\\\\\\(dashboard\\)\\\\inward-gate-passes\")",
+      "Bash(move \"app\\\\outward-gate-passes\" \"app\\\\\\(dashboard\\)\\\\outward-gate-passes\")",
+      "Bash(move \"app\\\\invoices\" \"app\\\\\\(dashboard\\)\\\\invoices\")",
+      "Bash(move \"app\\\\po-ledger\" \"app\\\\\\(dashboard\\)\\\\po-ledger\")",
+      "Bash(move \"app\\\\settings\" \"app\\\\\\(dashboard\\)\\\\settings\")",
+      "Bash(move \"app\\\\dispatches\" \"app\\\\\\(dashboard\\)\\\\dispatches\")",
+      "Bash(kill:*)",
+      "Bash(if exist \"c:\\\\Users\\\\yashw\\\\vyaparforge\\\\.next\" rmdir /s /q \"c:\\\\Users\\\\yashw\\\\vyaparforge\\\\.next\")",
+      "Bash(npx kill-port:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(ls:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

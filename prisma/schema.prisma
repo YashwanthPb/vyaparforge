@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────
+
+enum POStatus {
+  OPEN
+  PARTIALLY_FULFILLED
+  COMPLETED
+  CANCELLED
+}
+
+enum UnitType {
+  NOS
+  KG
+  MTR
+  SET
+  LOT
+}
+
+enum InvoiceStatus {
+  DRAFT
+  SENT
+  PARTIALLY_PAID
+  PAID
+  CANCELLED
+}
+
+enum PaymentMode {
+  NEFT
+  RTGS
+  CHEQUE
+  UPI
+  CASH
+}
+
+enum PaymentStatus {
+  PENDING
+  RECEIVED
+  CANCELLED
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+// ─── User ────────────────────────────────────────────────────────────
+
+model User {
+  id       String   @id @default(cuid())
+  email    String   @unique
+  name     String
+  password String
+  role     UserRole @default(USER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Division ────────────────────────────────────────────────────────
+
+model Division {
+  id   String @id @default(cuid())
+  name String @unique // e.g. "Aircraft Division"
+  code String @unique // e.g. "AD"
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+}
+
+// ─── Purchase Order ──────────────────────────────────────────────────
+
+model PurchaseOrder {
+  id           String   @id @default(cuid())
+  poNumber     String   @unique
+  date         DateTime
+  deliveryDate DateTime?
+  divisionId   String
+  status       POStatus @default(OPEN)
+  remarks      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  division          Division          @relation(fields: [divisionId], references: [id])
+  lineItems         POLineItem[]
+  inwardGatePasses  InwardGatePass[]
+  outwardGatePasses OutwardGatePass[]
+  invoices          Invoice[]
+
+  @@index([divisionId])
+  @@index([status])
+}
+
+// ─── PO Line Item ────────────────────────────────────────────────────
+
+model POLineItem {
+  id              String   @id @default(cuid())
+  purchaseOrderId String
+  partNumber      String
+  partName        String
+  workOrder       String?
+  qtyOrdered      Decimal  @db.Decimal(12, 2)
+  qtyReceived     Decimal  @default(0) @db.Decimal(12, 2)
+  qtyDispatched   Decimal  @default(0) @db.Decimal(12, 2)
+  rate            Decimal  @db.Decimal(12, 2)
+  unit            UnitType @default(NOS)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrder     PurchaseOrder     @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  inwardGatePasses  InwardGatePass[]
+  outwardGatePasses OutwardGatePass[]
+  invoiceItems      InvoiceItem[]
+
+  @@index([purchaseOrderId])
+  @@index([partNumber])
+}
+
+// ─── Inward Gate Pass (HAL sends raw material to us) ─────────────────
+
+model InwardGatePass {
+  id              String   @id @default(cuid())
+  gpNumber        String   @unique
+  date            DateTime
+  purchaseOrderId String
+  poLineItemId    String
+  batchNumber     String?
+  qty             Decimal  @db.Decimal(12, 2)
+  vehicleNumber   String?
+  challanNumber   String?
+  remarks         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  poLineItem    POLineItem    @relation(fields: [poLineItemId], references: [id])
+
+  @@index([purchaseOrderId])
+  @@index([poLineItemId])
+}
+
+// ─── Outward Gate Pass (We deliver fabricated parts to HAL) ──────────
+
+model OutwardGatePass {
+  id              String   @id @default(cuid())
+  gpNumber        String   @unique
+  date            DateTime
+  purchaseOrderId String
+  poLineItemId    String
+  batchNumber     String?
+  qty             Decimal  @db.Decimal(12, 2)
+  vehicleNumber   String?
+  challanNumber   String?
+  dispatchDate    DateTime?
+  remarks         String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id])
+  poLineItem    POLineItem    @relation(fields: [poLineItemId], references: [id])
+  invoice       Invoice?
+
+  @@index([purchaseOrderId])
+  @@index([poLineItemId])
+}
+
+// ─── Invoice ─────────────────────────────────────────────────────────
+
+model Invoice {
+  id                String        @id @default(cuid())
+  invoiceNumber     String        @unique
+  date              DateTime
+  purchaseOrderId   String
+  outwardGatePassId String?       @unique
+  subtotal          Decimal       @db.Decimal(12, 2)
+  cgst              Decimal       @default(0) @db.Decimal(12, 2)
+  sgst              Decimal       @default(0) @db.Decimal(12, 2)
+  igst              Decimal       @default(0) @db.Decimal(12, 2)
+  totalAmount       Decimal       @db.Decimal(12, 2)
+  status            InvoiceStatus @default(DRAFT)
+  remarks           String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  purchaseOrder   PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id])
+  outwardGatePass OutwardGatePass? @relation(fields: [outwardGatePassId], references: [id])
+  items           InvoiceItem[]
+  payments        Payment[]
+
+  @@index([purchaseOrderId])
+  @@index([status])
+}
+
+// ─── Invoice Item ────────────────────────────────────────────────────
+
+model InvoiceItem {
+  id           String  @id @default(cuid())
+  invoiceId    String
+  poLineItemId String
+  qty          Decimal @db.Decimal(12, 2)
+  rate         Decimal @db.Decimal(12, 2)
+  amount       Decimal @db.Decimal(12, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice    Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  poLineItem POLineItem @relation(fields: [poLineItemId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ─── Payment ─────────────────────────────────────────────────────────
+
+model Payment {
+  id        String        @id @default(cuid())
+  invoiceId String
+  amount    Decimal       @db.Decimal(12, 2)
+  date      DateTime
+  mode      PaymentMode?
+  reference String?
+  status    PaymentStatus @default(PENDING)
+  remarks   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([invoiceId])
+}
+
+// ─── Audit Log ───────────────────────────────────────────────────────
+
+model AuditLog {
+  id       String      @id @default(cuid())
+  entity   String
+  entityId String
+  action   AuditAction
+  changes  Json?
+  userId   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+}
