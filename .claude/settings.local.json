@@ -39,7 +39,11 @@
       "Bash(git config:*)",
       "Bash(npx next dev:*)",
       "Bash(timeout:*)",
-      "Bash(powershell -Command:*)"
+      "Bash(powershell -Command:*)",
+      "Bash(npm ls:*)",
+      "Bash(netstat:*)",
+      "Read(//c/Users/yashw/vyaparforge/**)",
+      "Bash(xargs:*)"
     ]
   }
 }
