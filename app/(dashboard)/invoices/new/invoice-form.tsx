@@ -185,7 +185,7 @@ export function InvoiceForm({
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
             Invoices can only be created for POs that have dispatched items
-            (outward gate passes). Create outward gate passes first, then return
+            (delivery challans). Create delivery challans first, then return
             here to generate invoices.
           </p>
         </CardContent>

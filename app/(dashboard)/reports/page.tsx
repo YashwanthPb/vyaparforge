@@ -3,7 +3,7 @@ import Link from "next/link";
 import {
   ClipboardList,
   ArrowDownToLine,
-  ArrowUpFromLine,
+  FileOutput,
   Receipt,
   Building2,
   IndianRupee,
@@ -39,11 +39,11 @@ const reportCards = [
     bg: "bg-green-50 dark:bg-green-950",
   },
   {
-    title: "Outward Gate Pass Register",
+    title: "Delivery Challan Register",
     description:
-      "Complete register of all outward gate passes — fabricated parts dispatched to HAL.",
+      "Complete register of all delivery challans — fabricated parts dispatched to HAL.",
     href: "/reports/outward-register",
-    icon: ArrowUpFromLine,
+    icon: FileOutput,
     color: "text-orange-600 dark:text-orange-400",
     bg: "bg-orange-50 dark:bg-orange-950",
   },

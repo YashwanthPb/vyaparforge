@@ -328,10 +328,10 @@ export default async function PurchaseOrderDetailPage({
         </CardContent>
       </Card>
 
-      {/* Outward Gate Passes Section */}
+      {/* Delivery Challans Section */}
       <Card>
         <CardHeader>
-          <CardTitle>Outward Gate Passes</CardTitle>
+          <CardTitle>Delivery Challans</CardTitle>
         </CardHeader>
         <CardContent>
           {po.outwardGatePasses.length === 0 ? (
@@ -343,7 +343,7 @@ export default async function PurchaseOrderDetailPage({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>GP Number</TableHead>
+                  <TableHead>DC Number</TableHead>
                   <TableHead>Date</TableHead>
                   <TableHead>Part Number</TableHead>
                   <TableHead>Batch</TableHead>

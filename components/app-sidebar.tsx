@@ -7,7 +7,7 @@ import {
   LayoutDashboard,
   FileText,
   ArrowDownToLine,
-  ArrowUpFromLine,
+  FileOutput,
   Receipt,
   BookOpen,
   BarChart3,
@@ -45,9 +45,9 @@ const mainNavItems = [
     icon: ArrowDownToLine,
   },
   {
-    title: "Outward Gate Passes",
+    title: "Delivery Challans",
     href: "/outward-gate-passes",
-    icon: ArrowUpFromLine,
+    icon: FileOutput,
   },
   {
     title: "Invoices",

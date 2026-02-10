@@ -3,7 +3,7 @@ import { getOutwardRegister, getDivisions } from "../actions";
 import { OutwardRegisterClient } from "./outward-register-client";
 
 export const metadata: Metadata = {
-  title: "Outward Gate Pass Register | VyaparForge",
+  title: "Delivery Challan Register | VyaparForge",
 };
 
 export const dynamic = "force-dynamic";
@@ -32,10 +32,10 @@ export default async function OutwardRegisterPage() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold tracking-tight">
-          Outward Gate Pass Register
+          Delivery Challan Register
         </h2>
         <p className="text-muted-foreground">
-          Complete register of all outward gate passes — fabricated parts
+          Complete register of all delivery challans — fabricated parts
           dispatched to HAL.
         </p>
       </div>

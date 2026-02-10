@@ -138,7 +138,7 @@ export function OutwardGatePassDialog({
     if (!selectedPo || !selectedLineItem) return;
 
     if (!gpNumber.trim()) {
-      toast.error("GP Number is required");
+      toast.error("DC Number is required");
       return;
     }
     if (!qty || Number(qty) <= 0) {
@@ -167,7 +167,7 @@ export function OutwardGatePassDialog({
 
     if (result.success) {
       toast.success(
-        `Dispatch ${result.gpNumber} recorded. PO updated.`
+        `Delivery Challan ${result.gpNumber} created. PO updated.`
       );
       onOpenChange(false);
     } else {
@@ -183,12 +183,12 @@ export function OutwardGatePassDialog({
           <DialogTitle>
             {step === 1 && "Search Purchase Order"}
             {step === 2 && "Select Line Item"}
-            {step === 3 && "Dispatch Details"}
+            {step === 3 && "New Delivery Challan"}
           </DialogTitle>
           <DialogDescription>
             {step === 1 && "Search by PO number to record a dispatch."}
             {step === 2 && "Choose the line item to dispatch."}
-            {step === 3 && "Enter the outward gate pass details."}
+            {step === 3 && "Enter the delivery challan details."}
           </DialogDescription>
         </DialogHeader>
 
@@ -353,9 +353,9 @@ export function OutwardGatePassDialog({
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">GP Number *</label>
+                <label className="text-sm font-medium">DC Number *</label>
                 <Input
-                  placeholder="e.g. OGP-001"
+                  placeholder="e.g. DC-001"
                   value={gpNumber}
                   onChange={(e) => setGpNumber(e.target.value)}
                   required

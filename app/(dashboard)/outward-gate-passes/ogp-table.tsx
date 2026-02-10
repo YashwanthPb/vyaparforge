@@ -55,7 +55,7 @@ export function OGPTable({
         <div className="relative max-w-sm flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
-            placeholder="Search by GP number, PO, part, division..."
+            placeholder="Search by DC number, PO, part, division..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -63,7 +63,7 @@ export function OGPTable({
         </div>
         <Button onClick={() => setDialogOpen(true)}>
           <Plus className="mr-2 size-4" />
-          New Dispatch
+          New DC
         </Button>
       </div>
 
@@ -71,7 +71,7 @@ export function OGPTable({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>GP Number</TableHead>
+              <TableHead>DC Number</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Division</TableHead>
@@ -90,7 +90,7 @@ export function OGPTable({
                 >
                   {search
                     ? "No dispatches match your search."
-                    : "No outward gate passes yet. Record your first dispatch."}
+                    : "No delivery challans yet. Create your first DC."}
                 </TableCell>
               </TableRow>
             ) : (

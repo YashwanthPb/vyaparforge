@@ -13,7 +13,7 @@ export function RecordDispatchButton({ po }: { po: POForDispatchDialog }) {
   return (
     <>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        Record Dispatch
+        New DC
       </Button>
       <OutwardGatePassDialog
         open={open}

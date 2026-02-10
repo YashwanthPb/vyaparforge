@@ -45,7 +45,9 @@
       "Read(//c/Users/yashw/vyaparforge/**)",
       "Bash(xargs:*)",
       "Bash(npx prisma db execute:*)",
-      "Bash(printf:*)"
+      "Bash(printf:*)",
+      "Bash(tasklist:*)",
+      "Bash(find:*)"
     ]
   }
 }

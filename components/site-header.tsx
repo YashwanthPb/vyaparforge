@@ -20,7 +20,7 @@ const routeTitles: Record<string, string> = {
   "/": "Dashboard",
   "/purchase-orders": "Purchase Orders",
   "/inward-gate-passes": "Inward Gate Passes",
-  "/outward-gate-passes": "Outward Gate Passes",
+  "/outward-gate-passes": "Delivery Challans",
   "/invoices": "Invoices",
   "/po-ledger": "PO Ledger",
   "/reports": "Reports",

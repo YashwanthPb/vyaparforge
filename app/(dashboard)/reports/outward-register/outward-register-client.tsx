@@ -86,7 +86,7 @@ export function OutwardRegisterClient({
     exportToExcel({
       data: data as unknown as Record<string, unknown>[],
       columns: [
-        { header: "GP Number", key: "gpNumber", width: 16 },
+        { header: "DC Number", key: "gpNumber", width: 16 },
         { header: "Date", key: "date", format: "date", width: 14 },
         { header: "PO Number", key: "poNumber", width: 18 },
         { header: "Division", key: "division", width: 22 },
@@ -97,8 +97,8 @@ export function OutwardRegisterClient({
         { header: "Vehicle", key: "vehicleNumber", width: 14 },
         { header: "Challan", key: "challanNumber", width: 14 },
       ],
-      filename: `Outward_GP_Register_${today}`,
-      sheetName: "Outward GP Register",
+      filename: `DC_Register_${today}`,
+      sheetName: "DC Register",
     });
   }
 
@@ -163,7 +163,7 @@ export function OutwardRegisterClient({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>GP Number</TableHead>
+              <TableHead>DC Number</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Division</TableHead>
@@ -182,7 +182,7 @@ export function OutwardRegisterClient({
                   colSpan={10}
                   className="h-24 text-center text-muted-foreground"
                 >
-                  No outward gate passes found.
+                  No delivery challans found.
                 </TableCell>
               </TableRow>
             ) : (
