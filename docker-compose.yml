@@ -1,30 +1,23 @@
-version: '3.8'
-
 services:
-  # 1. The Database
   db:
     image: postgres:15-alpine
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mysecurepassword  # Change this if you want
+      POSTGRES_PASSWORD: mysecurepassword
       POSTGRES_DB: vyaparforge
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  # 2. Your App
   app:
     build: .
     restart: always
     ports:
       - "3000:3000"
     environment:
-      # 'db' connects to the database service above
       DATABASE_URL: "postgresql://postgres:mysecurepassword@db:5432/vyaparforge"
     depends_on:
       - db
-    # This command runs migrations first, THEN starts the app
-    command: sh -c "npx prisma migrate deploy && npm start"
 
 volumes:
   postgres_data:
