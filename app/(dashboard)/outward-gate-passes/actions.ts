@@ -44,6 +44,50 @@ export async function getOutwardGatePasses() {
   }));
 }
 
+// ─── Get single Outward Gate Pass ───────────────────────────────────
+
+export async function getOutwardGatePass(id: string) {
+  const gatePass = await prisma.outwardGatePass.findUnique({
+    where: { id },
+    include: {
+      purchaseOrder: {
+        include: {
+          division: true,
+        },
+      },
+      poLineItem: {
+        select: {
+          partNumber: true,
+          partName: true,
+          workOrder: true,
+          unit: true,
+        },
+      },
+    },
+  });
+
+  if (!gatePass) return null;
+
+  return {
+    id: gatePass.id,
+    gpNumber: gatePass.gpNumber,
+    date: gatePass.date,
+    purchaseOrderId: gatePass.purchaseOrderId,
+    poNumber: gatePass.purchaseOrder.poNumber,
+    divisionName: gatePass.purchaseOrder.division.name,
+    partNumber: gatePass.poLineItem.partNumber,
+    partName: gatePass.poLineItem.partName,
+    workOrder: gatePass.poLineItem.workOrder,
+    unit: gatePass.poLineItem.unit,
+    batchNumber: gatePass.batchNumber,
+    qty: Number(gatePass.qty),
+    vehicleNumber: gatePass.vehicleNumber,
+    challanNumber: gatePass.challanNumber,
+    dispatchDate: gatePass.dispatchDate,
+    remarks: gatePass.remarks,
+  };
+}
+
 // ─── Search POs for Dispatch ────────────────────────────────────────
 
 export async function searchPOForDispatch(query: string) {

@@ -47,7 +47,8 @@
       "Bash(npx prisma db execute:*)",
       "Bash(printf:*)",
       "Bash(tasklist:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(npx cloc:*)"
     ]
   }
 }

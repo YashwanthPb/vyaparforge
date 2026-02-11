@@ -95,7 +95,7 @@ export function OGPTable({
               </TableRow>
             ) : (
               filtered.map((gp) => (
-                <TableRow key={gp.id}>
+                <TableRow key={gp.id} className="cursor-pointer" onClick={() => router.push(`/outward-gate-passes/${gp.id}`)}>
                   <TableCell className="font-medium">{gp.gpNumber}</TableCell>
                   <TableCell>
                     {format(new Date(gp.date), "dd-MM-yyyy")}

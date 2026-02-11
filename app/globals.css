@@ -124,3 +124,85 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ─── Print Optimization for Invoice & DC Templates ─────────────────── */
+@media print {
+  /* Hide all navigation, sidebar, header, and controls */
+  [data-sidebar],
+  header,
+  nav,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Reset page layout */
+  html, body {
+    background: white !important;
+    color: black !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    font-size: 11px !important;
+  }
+
+  /* A4 page setup */
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
+  }
+
+  /* The printable area should take full width */
+  #printable-area {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* Remove shadows and rounded corners in print */
+  .classic-invoice,
+  .modern-invoice,
+  .minimal-invoice,
+  .classic-dc,
+  .modern-dc {
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+
+  /* Ensure table rows don't break across pages */
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  /* Keep signature section together */
+  .classic-invoice > div > div:last-child,
+  .modern-invoice > div > div:last-child,
+  .minimal-invoice > div:last-child,
+  .classic-dc > div > div:last-child,
+  .modern-dc > div > div:last-child {
+    page-break-inside: avoid;
+  }
+
+  /* Remove any container padding/margin that interferes */
+  main, [role="main"] {
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Ensure colors print properly */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
