@@ -23,7 +23,7 @@ services:
       NEXTAUTH_URL: "http://167.235.141.107:3000"
       
       # Run 'openssl rand -base64 32' to generate a unique secret
-      NEXTAUTH_SECRET: "6b3e7f9a1c2d4e5f8g9h0i1j2k3l4m5n6o7p8q9r0s"
+      NEXTAUTH_SECRET: "PvsrSQjjzutkehCwg94S5QrGA3zYVULwnBh/eIz1o8g="
       
     depends_on:
       - db
