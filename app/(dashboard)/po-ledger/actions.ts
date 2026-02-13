@@ -2,6 +2,8 @@
 
 import { prisma } from "@/lib/db";
 import { poLedgerFiltersSchema } from "@/lib/validations";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -54,6 +56,9 @@ type DivisionOption = {
 // ─── Get Divisions for filter dropdown ──────────────────────────────
 
 export async function getDivisions(): Promise<DivisionOption[]> {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const divisions = await prisma.division.findMany({
     orderBy: { name: "asc" },
   });
@@ -65,6 +70,9 @@ export async function getDivisions(): Promise<DivisionOption[]> {
 export async function getPOLedgerData(
   filters: POLedgerFilters = {}
 ): Promise<POLedgerData> {
+  const session = await getServerSession(authOptions);
+  if (!session) return { rows: [], summary: { totalOrdered: 0, totalReceived: 0, totalDispatched: 0, totalBalance: 0, totalBalanceValue: 0, rowCount: 0 } };
+
   const parsed = poLedgerFiltersSchema.safeParse(filters);
   const validFilters: POLedgerFilters = parsed.success ? parsed.data : {};
 

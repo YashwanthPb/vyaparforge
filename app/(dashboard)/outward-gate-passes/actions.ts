@@ -13,6 +13,9 @@ import {
 // ─── Get all Outward Gate Passes ────────────────────────────────────
 
 export async function getOutwardGatePasses() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const gatePasses = await prisma.outwardGatePass.findMany({
     include: {
       purchaseOrder: {
@@ -47,6 +50,9 @@ export async function getOutwardGatePasses() {
 // ─── Get single Outward Gate Pass ───────────────────────────────────
 
 export async function getOutwardGatePass(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
   const gatePass = await prisma.outwardGatePass.findUnique({
     where: { id },
     include: {
@@ -91,6 +97,9 @@ export async function getOutwardGatePass(id: string) {
 // ─── Search POs for Dispatch ────────────────────────────────────────
 
 export async function searchPOForDispatch(query: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const parsed = searchQuerySchema.safeParse({ query });
   if (!parsed.success) return [];
 
@@ -234,6 +243,16 @@ export async function createOutwardGatePass(data: {
       });
 
       return gatePass;
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "OutwardGatePass",
+        entityId: result.id,
+        action: "CREATE",
+        changes: { gpNumber: result.gpNumber, purchaseOrderId: validated.purchaseOrderId },
+        userId: session.user.id,
+      },
     });
 
     revalidatePath("/outward-gate-passes");

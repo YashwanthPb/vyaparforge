@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getDivisions } from "./actions";
+import { getDivisions, getCompanyProfile } from "./actions";
 import { CompanyProfileForm } from "./company-profile-form";
 import { DivisionManagement } from "./division-management";
 
@@ -10,7 +10,10 @@ export const metadata: Metadata = {
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const divisions = await getDivisions();
+  const [divisions, companyProfile] = await Promise.all([
+    getDivisions(),
+    getCompanyProfile(),
+  ]);
 
   return (
     <div className="space-y-6">
@@ -21,7 +24,7 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <CompanyProfileForm />
+      <CompanyProfileForm initialProfile={companyProfile} />
       <DivisionManagement divisions={divisions} />
     </div>
   );

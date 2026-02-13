@@ -13,6 +13,9 @@ import {
 // ─── Get all Inward Gate Passes ─────────────────────────────────────
 
 export async function getInwardGatePasses() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const gatePasses = await prisma.inwardGatePass.findMany({
     include: {
       purchaseOrder: {
@@ -46,6 +49,9 @@ export async function getInwardGatePasses() {
 // ─── Search Purchase Orders ─────────────────────────────────────────
 
 export async function searchPurchaseOrder(query: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const parsed = searchQuerySchema.safeParse({ query });
   if (!parsed.success) return [];
 
@@ -181,6 +187,16 @@ export async function createInwardGatePass(data: {
       });
 
       return gatePass;
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "InwardGatePass",
+        entityId: result.id,
+        action: "CREATE",
+        changes: { gpNumber: result.gpNumber, purchaseOrderId: validated.purchaseOrderId },
+        userId: session.user.id,
+      },
     });
 
     revalidatePath("/inward-gate-passes");

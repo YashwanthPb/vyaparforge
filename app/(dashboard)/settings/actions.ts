@@ -19,6 +19,9 @@ type DivisionRow = {
 };
 
 export async function getDivisions(): Promise<DivisionRow[]> {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const divisions = await prisma.division.findMany({
     include: { _count: { select: { purchaseOrders: true } } },
     orderBy: { name: "asc" },
@@ -113,6 +116,7 @@ export async function deleteDivision(
 ): Promise<{ success: boolean; error?: string }> {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Unauthorized" };
+  if (session.user.role !== "ADMIN") return { success: false, error: "Access denied. Admin role required." };
 
   const parsed = deleteDivisionSchema.safeParse({ id });
   if (!parsed.success) {
@@ -139,5 +143,89 @@ export async function deleteDivision(
     return { success: true };
   } catch {
     return { success: false, error: "Failed to delete division." };
+  }
+}
+
+// ─── Company Profile ────────────────────────────────────────────────
+
+export type CompanyProfileData = {
+  id: string;
+  name: string;
+  gstin: string;
+  address: string;
+  phone: string;
+  email: string;
+  state: string;
+  stateCode: string;
+};
+
+export async function getCompanyProfile(): Promise<CompanyProfileData | null> {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
+  const profile = await prisma.companyProfile.findFirst();
+  if (!profile) return null;
+
+  return {
+    id: profile.id,
+    name: profile.name,
+    gstin: profile.gstin,
+    address: profile.address,
+    phone: profile.phone,
+    email: profile.email,
+    state: profile.state,
+    stateCode: profile.stateCode,
+  };
+}
+
+export async function updateCompanyProfile(data: {
+  name: string;
+  gstin?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  state?: string;
+  stateCode?: string;
+}): Promise<{ success: boolean; error?: string }> {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false, error: "Unauthorized" };
+  if (session.user.role !== "ADMIN") return { success: false, error: "Access denied. Admin role required." };
+
+  if (!data.name || data.name.trim().length === 0) {
+    return { success: false, error: "Company name is required." };
+  }
+
+  try {
+    const existing = await prisma.companyProfile.findFirst();
+    if (existing) {
+      await prisma.companyProfile.update({
+        where: { id: existing.id },
+        data: {
+          name: data.name.trim(),
+          gstin: data.gstin?.trim() ?? "",
+          address: data.address?.trim() ?? "",
+          phone: data.phone?.trim() ?? "",
+          email: data.email?.trim() ?? "",
+          state: data.state?.trim() ?? "",
+          stateCode: data.stateCode?.trim() ?? "",
+        },
+      });
+    } else {
+      await prisma.companyProfile.create({
+        data: {
+          name: data.name.trim(),
+          gstin: data.gstin?.trim() ?? "",
+          address: data.address?.trim() ?? "",
+          phone: data.phone?.trim() ?? "",
+          email: data.email?.trim() ?? "",
+          state: data.state?.trim() ?? "",
+          stateCode: data.stateCode?.trim() ?? "",
+        },
+      });
+    }
+    revalidatePath("/settings");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to save company profile." };
   }
 }

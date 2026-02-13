@@ -15,6 +15,9 @@ import {
 // ─── Get all Invoices ───────────────────────────────────────────────
 
 export async function getInvoices() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const invoices = await prisma.invoice.findMany({
     include: {
       purchaseOrder: {
@@ -44,6 +47,9 @@ export async function getInvoices() {
 // ─── Get single Invoice ─────────────────────────────────────────────
 
 export async function getInvoice(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
   const parsed = getByIdSchema.safeParse({ id });
   if (!parsed.success) {
     return null;
@@ -81,6 +87,9 @@ export async function getInvoice(id: string) {
 // ─── Get POs with dispatched items for invoicing ────────────────────
 
 export async function getPOsWithDispatches() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   try {
     // Find all non-cancelled POs that have at least one line item with qtyDispatched > 0
     const purchaseOrders = await prisma.purchaseOrder.findMany({
@@ -105,8 +114,6 @@ export async function getPOsWithDispatches() {
       },
       orderBy: { createdAt: "desc" },
     });
-
-    console.log("[getPOsWithDispatches] POs with dispatched items:", purchaseOrders.length);
 
     const result = purchaseOrders
       .map((po) => ({
@@ -137,17 +144,8 @@ export async function getPOsWithDispatches() {
       }))
       .filter((po) => po.lineItems.length > 0);
 
-    console.log("[getPOsWithDispatches] POs with invoiceable items:", result.length);
-    result.forEach((po) => {
-      console.log(`  PO ${po.poNumber} (${po.divisionName}): ${po.lineItems.length} invoiceable items`);
-      po.lineItems.forEach((item) => {
-        console.log(`    ${item.partNumber}: dispatched=${item.qtyDispatched}, invoiced=${item.alreadyInvoiced}, invoiceable=${item.invoiceableQty}`);
-      });
-    });
-
     return result;
-  } catch (error) {
-    console.error("[getPOsWithDispatches] Error:", error);
+  } catch {
     return [];
   }
 }
@@ -163,6 +161,9 @@ function getFinancialYear(date: Date): string {
 }
 
 export async function getNextInvoiceNumber() {
+  const session = await getServerSession(authOptions);
+  if (!session) return "";
+
   const fy = getFinancialYear(new Date());
   const prefix = `SSI/INV/${fy}/`;
 
@@ -279,6 +280,16 @@ export async function createInvoice(data: {
       });
     });
 
+    await prisma.auditLog.create({
+      data: {
+        entity: "Invoice",
+        entityId: invoice.id,
+        action: "CREATE",
+        changes: { invoiceNumber: invoice.invoiceNumber },
+        userId: session.user.id,
+      },
+    });
+
     revalidatePath("/invoices");
     return { success: true as const, id: invoice.id };
   } catch (error) {
@@ -387,6 +398,16 @@ export async function recordPayment(data: {
     await prisma.invoice.update({
       where: { id: validated.invoiceId },
       data: { status: newStatus },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "Payment",
+        entityId: validated.invoiceId,
+        action: "CREATE",
+        changes: { amount: validated.amount, invoiceNumber: invoice.invoiceNumber },
+        userId: session.user.id,
+      },
     });
 
     revalidatePath("/invoices");

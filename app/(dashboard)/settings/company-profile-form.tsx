@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { toast } from "sonner";
 import { Save } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -12,51 +12,52 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { updateCompanyProfile } from "./actions";
+import type { CompanyProfileData } from "./actions";
 
-type CompanyProfile = {
-  companyName: string;
-  gstin: string;
-  address: string;
-  phone: string;
-  email: string;
+type Props = {
+  initialProfile: CompanyProfileData | null;
 };
 
-const STORAGE_KEY = "vyaparforge-company-profile";
-
-const defaults: CompanyProfile = {
-  companyName: "Shri Shakthi Industries",
+const defaults = {
+  name: "Shri Shakthi Industries",
   gstin: "",
   address: "",
   phone: "",
   email: "",
+  state: "",
+  stateCode: "",
 };
 
-export function CompanyProfileForm() {
-  const [profile, setProfile] = useState<CompanyProfile>(defaults);
-  const [loaded, setLoaded] = useState(false);
+export function CompanyProfileForm({ initialProfile }: Props) {
+  const [profile, setProfile] = useState({
+    name: initialProfile?.name ?? defaults.name,
+    gstin: initialProfile?.gstin ?? defaults.gstin,
+    address: initialProfile?.address ?? defaults.address,
+    phone: initialProfile?.phone ?? defaults.phone,
+    email: initialProfile?.email ?? defaults.email,
+    state: initialProfile?.state ?? defaults.state,
+    stateCode: initialProfile?.stateCode ?? defaults.stateCode,
+  });
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        setProfile({ ...defaults, ...JSON.parse(stored) });
-      }
-    } catch {
-      // ignore parse errors
-    }
-    setLoaded(true);
-  }, []);
-
-  function handleChange(field: keyof CompanyProfile, value: string) {
+  function handleChange(field: keyof typeof profile, value: string) {
     setProfile((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSave() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profile));
-    toast.success("Company profile saved");
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const result = await updateCompanyProfile(profile);
+      if (result.success) {
+        toast.success("Company profile saved");
+      } else {
+        toast.error(result.error ?? "Failed to save");
+      }
+    } finally {
+      setSaving(false);
+    }
   }
-
-  if (!loaded) return null;
 
   return (
     <Card>
@@ -71,8 +72,8 @@ export function CompanyProfileForm() {
           <div className="space-y-2 sm:col-span-2">
             <label className="text-sm font-medium">Company Name</label>
             <Input
-              value={profile.companyName}
-              onChange={(e) => handleChange("companyName", e.target.value)}
+              value={profile.name}
+              onChange={(e) => handleChange("name", e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -109,10 +110,27 @@ export function CompanyProfileForm() {
               placeholder="Full address"
             />
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">State</label>
+            <Input
+              value={profile.state}
+              onChange={(e) => handleChange("state", e.target.value)}
+              placeholder="e.g. Karnataka"
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">State Code</label>
+            <Input
+              value={profile.stateCode}
+              onChange={(e) => handleChange("stateCode", e.target.value)}
+              placeholder="e.g. 29"
+              maxLength={2}
+            />
+          </div>
           <div className="sm:col-span-2">
-            <Button onClick={handleSave}>
+            <Button onClick={handleSave} disabled={saving}>
               <Save className="mr-2 size-4" />
-              Save Profile
+              {saving ? "Saving..." : "Save Profile"}
             </Button>
           </div>
         </div>

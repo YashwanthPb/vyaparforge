@@ -249,6 +249,22 @@ model Payment {
   @@index([invoiceId])
 }
 
+// ─── Company Profile ─────────────────────────────────────────────────
+
+model CompanyProfile {
+  id        String @id @default(cuid())
+  name      String
+  gstin     String @default("")
+  address   String @default("")
+  phone     String @default("")
+  email     String @default("")
+  state     String @default("")
+  stateCode String @default("")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // ─── Audit Log ───────────────────────────────────────────────────────
 
 model AuditLog {

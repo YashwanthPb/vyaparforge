@@ -15,6 +15,9 @@ import {
 // ─── Get all Purchase Orders ────────────────────────────────────────
 
 export async function getPurchaseOrders() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const purchaseOrders = await prisma.purchaseOrder.findMany({
     include: {
       division: true,
@@ -61,6 +64,9 @@ export async function getPurchaseOrders() {
 // ─── Get single Purchase Order ──────────────────────────────────────
 
 export async function getPurchaseOrder(id: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return null;
+
   const parsed = getByIdSchema.safeParse({ id });
   if (!parsed.success) {
     return null;
@@ -98,6 +104,9 @@ export async function getPurchaseOrder(id: string) {
 // ─── Get all Divisions ──────────────────────────────────────────────
 
 export async function getDivisions() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   return prisma.division.findMany({
     orderBy: { name: "asc" },
   });
@@ -148,6 +157,16 @@ export async function createPurchaseOrder(data: {
             unit: item.unit,
           })),
         },
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "PurchaseOrder",
+        entityId: po.id,
+        action: "CREATE",
+        changes: { poNumber: po.poNumber },
+        userId: session.user.id,
       },
     });
 
@@ -237,6 +256,7 @@ export async function updatePurchaseOrder(
 export async function deletePurchaseOrder(id: string) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Unauthorized" };
+  if (session.user.role !== "ADMIN") return { success: false, error: "Access denied. Admin role required." };
 
   const parsed = deletePurchaseOrderSchema.safeParse({ id });
   if (!parsed.success) {

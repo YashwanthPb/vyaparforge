@@ -1,10 +1,14 @@
 "use server";
 
 import { prisma } from "@/lib/db";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // ─── Dashboard Stats ────────────────────────────────────────────────
 
 export async function getDashboardStats() {
+  const session = await getServerSession(authOptions);
+  if (!session) return { openPOs: 0, pendingMaterial: 0, readyToDispatch: 0, overdue: 0 };
   const [openPOs, lineItems, overdue] = await Promise.all([
     // Count of POs with status OPEN or PARTIALLY_FULFILLED
     prisma.purchaseOrder.count({
@@ -44,6 +48,9 @@ export async function getDashboardStats() {
 // ─── Active POs (10 most recent open/partially fulfilled) ───────────
 
 export async function getActivePOs() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const pos = await prisma.purchaseOrder.findMany({
     where: { status: { in: ["OPEN", "PARTIALLY_FULFILLED"] } },
     include: {
@@ -88,6 +95,9 @@ export async function getActivePOs() {
 // ─── Division Summary ───────────────────────────────────────────────
 
 export async function getDivisionSummary() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const divisions = await prisma.division.findMany({
     include: {
       purchaseOrders: {
