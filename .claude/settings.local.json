@@ -48,7 +48,8 @@
       "Bash(printf:*)",
       "Bash(tasklist:*)",
       "Bash(find:*)",
-      "Bash(npx cloc:*)"
+      "Bash(npx cloc:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
