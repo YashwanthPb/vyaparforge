@@ -4,7 +4,7 @@ services:
     restart: always
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: mysecurepassword
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: vyaparforge
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -16,14 +16,11 @@ services:
       - "3000:3000"
     environment:
       # Database connection
-      DATABASE_URL: "postgresql://postgres:mysecurepassword@db:5432/vyaparforge"
+      DATABASE_URL: ${DATABASE_URL}
       
       # Authentication Configuration
-      # Replace with your actual server IP or domain
-      NEXTAUTH_URL: "http://167.235.141.107:3000"
-      
-      # Run 'openssl rand -base64 32' to generate a unique secret
-      NEXTAUTH_SECRET: "PvsrSQjjzutkehCwg94S5QrGA3zYVULwnBh/eIz1o8g="
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       
     depends_on:
       - db

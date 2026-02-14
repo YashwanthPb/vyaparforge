@@ -299,10 +299,12 @@ export async function createInvoice(data: {
     ) {
       return { success: false as const, error: "Invoice number already exists" };
     }
-    if (error instanceof Error) {
+    // Only pass through our own intentional validation errors
+    if (error instanceof Error && error.message.startsWith("Qty")) {
       return { success: false as const, error: error.message };
     }
-    return { success: false as const, error: "Failed to create invoice" };
+    console.error("createInvoice error:", error);
+    return { success: false as const, error: "Failed to create invoice. Please try again." };
   }
 }
 
@@ -414,9 +416,10 @@ export async function recordPayment(data: {
     revalidatePath(`/invoices/${validated.invoiceId}`);
     return { success: true as const };
   } catch (error) {
-    if (error instanceof Error) {
+    if (error instanceof Error && error.message.includes("exceeds remaining balance")) {
       return { success: false as const, error: error.message };
     }
-    return { success: false as const, error: "Failed to record payment" };
+    console.error("recordPayment error:", error);
+    return { success: false as const, error: "Failed to record payment. Please try again." };
   }
 }

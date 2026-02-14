@@ -2,10 +2,15 @@
 
 import { prisma } from "@/lib/db";
 import { Prisma } from "@prisma/client";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 
 // ─── Shared ─────────────────────────────────────────────────────────
 
 export async function getDivisions() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   return await prisma.division.findMany({
     orderBy: { name: "asc" },
     select: { id: true, name: true, code: true },
@@ -22,6 +27,9 @@ interface POBalanceFilters {
 }
 
 export async function getPOBalanceReport(filters: POBalanceFilters) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const where: Prisma.PurchaseOrderWhereInput = {};
 
   if (filters.divisionId) {
@@ -89,6 +97,9 @@ interface GPRegisterFilters {
 }
 
 export async function getInwardRegister(filters: GPRegisterFilters) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const where: Prisma.InwardGatePassWhereInput = {};
 
   if (filters.divisionId) {
@@ -120,6 +131,9 @@ export async function getInwardRegister(filters: GPRegisterFilters) {
 // ─── Outward Gate Pass Register ─────────────────────────────────────
 
 export async function getOutwardRegister(filters: GPRegisterFilters) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const where: Prisma.OutwardGatePassWhereInput = {};
 
   if (filters.divisionId) {
@@ -158,6 +172,9 @@ interface InvoiceRegisterFilters {
 }
 
 export async function getInvoiceRegister(filters: InvoiceRegisterFilters) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const where: Prisma.InvoiceWhereInput = {};
 
   if (filters.divisionId) {
@@ -222,6 +239,9 @@ export async function getInvoiceRegister(filters: InvoiceRegisterFilters) {
 // ─── Division-wise Summary ──────────────────────────────────────────
 
 export async function getDivisionSummary() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const divisions = await prisma.division.findMany({
     include: {
       purchaseOrders: {
@@ -287,6 +307,9 @@ export async function getDivisionSummary() {
 // ─── Outstanding Payments ───────────────────────────────────────────
 
 export async function getOutstandingPayments() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
   const invoices = await prisma.invoice.findMany({
     where: {
       status: { notIn: ["PAID", "CANCELLED"] },

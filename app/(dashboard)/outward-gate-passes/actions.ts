@@ -8,6 +8,7 @@ import { authOptions } from "@/lib/auth";
 import {
   createOutwardGatePassSchema,
   searchQuerySchema,
+  getByIdSchema,
 } from "@/lib/validations";
 
 // ─── Get all Outward Gate Passes ────────────────────────────────────
@@ -53,8 +54,11 @@ export async function getOutwardGatePass(id: string) {
   const session = await getServerSession(authOptions);
   if (!session) return null;
 
+  const parsed = getByIdSchema.safeParse({ id });
+  if (!parsed.success) return null;
+
   const gatePass = await prisma.outwardGatePass.findUnique({
-    where: { id },
+    where: { id: parsed.data.id },
     include: {
       purchaseOrder: {
         include: {
