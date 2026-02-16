@@ -221,8 +221,8 @@ export async function getInvoiceRegister(filters: InvoiceRegisterFilters) {
       id: inv.id,
       invoiceNumber: inv.invoiceNumber,
       date: inv.date.toISOString(),
-      poNumber: inv.purchaseOrder.poNumber,
-      division: inv.purchaseOrder.division.name,
+      poNumber: inv.purchaseOrder?.poNumber ?? "",
+      division: inv.purchaseOrder?.division.name ?? "",
       subtotal: Number(inv.subtotal),
       cgst: Number(inv.cgst),
       sgst: Number(inv.sgst),
@@ -312,7 +312,7 @@ export async function getOutstandingPayments() {
 
   const invoices = await prisma.invoice.findMany({
     where: {
-      status: { notIn: ["PAID", "CANCELLED"] },
+      status: { not: "PAID" },
     },
     include: {
       purchaseOrder: {
@@ -350,8 +350,8 @@ export async function getOutstandingPayments() {
         id: inv.id,
         invoiceNumber: inv.invoiceNumber,
         date: inv.date.toISOString(),
-        poNumber: inv.purchaseOrder.poNumber,
-        division: inv.purchaseOrder.division.name,
+        poNumber: inv.purchaseOrder?.poNumber ?? "",
+        division: inv.purchaseOrder?.division.name ?? "",
         totalAmount,
         paidAmount: totalPaid,
         outstandingAmount,
@@ -359,16 +359,16 @@ export async function getOutstandingPayments() {
       };
     })
     .filter(Boolean) as {
-    id: string;
-    invoiceNumber: string;
-    date: string;
-    poNumber: string;
-    division: string;
-    totalAmount: number;
-    paidAmount: number;
-    outstandingAmount: number;
-    daysOverdue: number;
-  }[];
+      id: string;
+      invoiceNumber: string;
+      date: string;
+      poNumber: string;
+      division: string;
+      totalAmount: number;
+      paidAmount: number;
+      outstandingAmount: number;
+      daysOverdue: number;
+    }[];
 }
 
 // ─── Party Ledger ────────────────────────────────────────────────────
@@ -482,7 +482,7 @@ export async function getOutstandingReceivables() {
   if (!session) return [];
 
   const invoices = await prisma.invoice.findMany({
-    where: { status: { notIn: ["PAID", "CANCELLED"] } },
+    where: { status: { not: "PAID" } },
     include: {
       party: { select: { name: true } },
       purchaseOrder: {
@@ -528,17 +528,17 @@ export async function getOutstandingReceivables() {
       };
     })
     .filter(Boolean) as {
-    id: string;
-    invoiceNumber: string;
-    date: string;
-    partyName: string;
-    poNumber: string;
-    division: string;
-    totalAmount: number;
-    paidAmount: number;
-    outstandingAmount: number;
-    daysOverdue: number;
-  }[];
+      id: string;
+      invoiceNumber: string;
+      date: string;
+      partyName: string;
+      poNumber: string;
+      division: string;
+      totalAmount: number;
+      paidAmount: number;
+      outstandingAmount: number;
+      daysOverdue: number;
+    }[];
 }
 
 // ─── Outstanding Payables ────────────────────────────────────────────
@@ -582,15 +582,15 @@ export async function getOutstandingPayables() {
       };
     })
     .filter(Boolean) as {
-    id: string;
-    invoiceNumber: string;
-    date: string;
-    supplierName: string;
-    poNumber: string;
-    totalAmount: number;
-    paidAmount: number;
-    balanceDue: number;
-    paymentStatus: string;
-    daysOverdue: number;
-  }[];
+      id: string;
+      invoiceNumber: string;
+      date: string;
+      supplierName: string;
+      poNumber: string;
+      totalAmount: number;
+      paidAmount: number;
+      balanceDue: number;
+      paymentStatus: string;
+      daysOverdue: number;
+    }[];
 }

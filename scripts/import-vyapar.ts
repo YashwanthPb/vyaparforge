@@ -156,11 +156,11 @@ function mapPaymentStatus(
 
 function mapInvoiceStatus(
   rawStatus: string
-): "PAID" | "PARTIALLY_PAID" | "DRAFT" {
+): "PAID" | "PARTIALLY_PAID" | "UNPAID" {
   const ps = mapPaymentStatus(rawStatus);
   if (ps === "PAID") return "PAID";
   if (ps === "PARTIALLY_PAID") return "PARTIALLY_PAID";
-  return "DRAFT";
+  return "UNPAID";
 }
 
 // ─── Step 1: Import Parties ───────────────────────────────────────────

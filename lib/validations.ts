@@ -174,7 +174,7 @@ export const deleteDivisionSchema = z.object({
 
 export const updatePaymentStatusSchema = z.object({
   invoiceId: requiredId,
-  status: z.enum(["DRAFT", "SENT", "PARTIALLY_PAID", "PAID", "CANCELLED"]),
+  status: z.enum(["UNPAID", "PARTIALLY_PAID", "PAID"]),
 });
 
 // ─── PO Ledger Filters ────────────────────────────────────────────

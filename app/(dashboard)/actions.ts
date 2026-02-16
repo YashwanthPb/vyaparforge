@@ -100,7 +100,7 @@ export async function getOutstandingStats() {
 
   const [unpaidInvoices, unpaidPurchases] = await Promise.all([
     prisma.invoice.findMany({
-      where: { status: { notIn: ["PAID", "CANCELLED"] } },
+      where: { status: { not: "PAID" } },
       select: {
         totalAmount: true,
         payments: { where: { status: "RECEIVED" }, select: { amount: true } },

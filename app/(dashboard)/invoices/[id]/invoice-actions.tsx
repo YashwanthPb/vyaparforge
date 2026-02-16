@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Printer, CheckCircle, Send } from "lucide-react";
+import { Printer, CheckCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -43,18 +43,6 @@ export function InvoiceActions({
     const result = await updatePaymentStatus(invoiceId, "PAID");
     if (result.success) {
       toast.success("Invoice marked as paid");
-      router.refresh();
-    } else {
-      toast.error(result.error ?? "Failed to update status");
-    }
-    setSaving(false);
-  }
-
-  async function handleMarkSent() {
-    setSaving(true);
-    const result = await updatePaymentStatus(invoiceId, "SENT");
-    if (result.success) {
-      toast.success("Invoice marked as sent");
       router.refresh();
     } else {
       toast.error(result.error ?? "Failed to update status");
@@ -108,23 +96,14 @@ export function InvoiceActions({
         Print
       </Button>
 
-      {status === "DRAFT" && (
-        <Button variant="outline" onClick={handleMarkSent} disabled={saving}>
-          <Send className="mr-2 size-4" />
-          Mark Sent
-        </Button>
-      )}
-
-      {(status === "DRAFT" ||
-        status === "SENT" ||
-        status === "PARTIALLY_PAID") && (
+      {(status === "UNPAID" || status === "PARTIALLY_PAID") && (
         <Button onClick={handleMarkPaid} disabled={saving}>
           <CheckCircle className="mr-2 size-4" />
           Mark Paid
         </Button>
       )}
 
-      {status !== "PAID" && status !== "CANCELLED" && (
+      {status !== "PAID" && (
         <Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
           <DialogTrigger asChild>
             <Button variant="outline">Record Payment</Button>

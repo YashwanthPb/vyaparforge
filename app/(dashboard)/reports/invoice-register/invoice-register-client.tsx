@@ -73,7 +73,7 @@ export function InvoiceRegisterClient({
             : statusFilter === "Paid"
               ? "PAID"
               : statusFilter === "Unpaid"
-                ? "DRAFT"
+                ? "UNPAID"
                 : "PARTIALLY_PAID",
         dateFrom: dateFrom || undefined,
         dateTo: dateTo || undefined,

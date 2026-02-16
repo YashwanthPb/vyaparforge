@@ -12,13 +12,110 @@ import {
   getByIdSchema,
 } from "@/lib/validations";
 
+// ─── Types ──────────────────────────────────────────────────────────
+
+export interface InvoiceFilters {
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+  status?: string;
+  partyId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface InvoiceRow {
+  id: string;
+  invoiceNumber: string;
+  date: Date;
+  poNumber: string;
+  divisionName: string;
+  partyId: string;
+  partyName: string;
+  subtotal: number;
+  cgst: number;
+  sgst: number;
+  igst: number;
+  totalAmount: number;
+  status: "UNPAID" | "PARTIALLY_PAID" | "PAID";
+  dcNumber: string;
+  gatePassNumber: string;
+}
+
 // ─── Get all Invoices ───────────────────────────────────────────────
 
-export async function getInvoices() {
+export async function getInvoices(filters: InvoiceFilters = {}) {
   const session = await getServerSession(authOptions);
   if (!session) return [];
 
+  const where: Prisma.InvoiceWhereInput = {};
+
+  // Status filter
+  if (filters.status && filters.status !== "ALL") {
+    where.status = filters.status as Prisma.EnumInvoiceStatusFilter["equals"];
+  }
+
+  // Party filter
+  if (filters.partyId) {
+    where.partyId = filters.partyId;
+  }
+
+  // Date range filter
+  if (filters.dateFrom || filters.dateTo) {
+    where.date = {};
+    if (filters.dateFrom) where.date.gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      where.date.lte = to;
+    }
+  }
+
+  // Search across multiple fields
+  if (filters.search) {
+    const term = filters.search.trim();
+    if (term) {
+      where.OR = [
+        { invoiceNumber: { contains: term, mode: "insensitive" } },
+        { dcNumber: { contains: term, mode: "insensitive" } },
+        { gatePassNumber: { contains: term, mode: "insensitive" } },
+        { party: { name: { contains: term, mode: "insensitive" } } },
+        {
+          purchaseOrder: {
+            poNumber: { contains: term, mode: "insensitive" },
+          },
+        },
+      ];
+    }
+  }
+
+  // Sorting
+  const sortFieldMap: Record<string, string> = {
+    invoiceNumber: "invoiceNumber",
+    date: "date",
+    poNumber: "purchaseOrder",
+    party: "party",
+    totalAmount: "totalAmount",
+    status: "status",
+  };
+
+  let orderBy: Prisma.InvoiceOrderByWithRelationInput = { createdAt: "desc" };
+
+  if (filters.sort && sortFieldMap[filters.sort]) {
+    const direction = filters.order === "asc" ? "asc" : "desc";
+    const field = filters.sort;
+
+    if (field === "poNumber") {
+      orderBy = { purchaseOrder: { poNumber: direction } };
+    } else if (field === "party") {
+      orderBy = { party: { name: direction } };
+    } else {
+      orderBy = { [sortFieldMap[field]]: direction };
+    }
+  }
+
   const invoices = await prisma.invoice.findMany({
+    where,
     include: {
       purchaseOrder: {
         include: {
@@ -27,7 +124,7 @@ export async function getInvoices() {
       },
       party: { select: { id: true, name: true } },
     },
-    orderBy: { createdAt: "desc" },
+    orderBy,
   });
 
   return invoices.map((inv) => ({
@@ -47,6 +144,21 @@ export async function getInvoices() {
     dcNumber: inv.dcNumber ?? "",
     gatePassNumber: inv.gatePassNumber ?? "",
   }));
+}
+
+// ─── Get Parties for filter ─────────────────────────────────────────
+
+export async function getPartiesForFilter() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  return await prisma.party.findMany({
+    where: {
+      invoices: { some: {} },
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 }
 
 // ─── Get single Invoice ─────────────────────────────────────────────
@@ -272,6 +384,7 @@ export async function createInvoice(data: {
           sgst: new Prisma.Decimal(sgst.toFixed(2)),
           igst: new Prisma.Decimal(igst.toFixed(2)),
           totalAmount: new Prisma.Decimal(totalAmount.toFixed(2)),
+          balanceDue: new Prisma.Decimal(totalAmount.toFixed(2)),
           remarks: validated.remarks || null,
           items: {
             create: validated.items.map((item) => ({
@@ -317,7 +430,7 @@ export async function createInvoice(data: {
 
 export async function updatePaymentStatus(
   invoiceId: string,
-  status: "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED"
+  status: "UNPAID" | "PARTIALLY_PAID" | "PAID"
 ) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false as const, error: "Unauthorized" };
@@ -338,6 +451,88 @@ export async function updatePaymentStatus(
     return { success: true as const };
   } catch {
     return { success: false as const, error: "Failed to update payment status" };
+  }
+}
+
+// ─── Bulk Mark as Paid ──────────────────────────────────────────────
+
+export async function bulkMarkAsPaid(invoiceIds: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false as const, error: "Unauthorized" };
+
+  if (!invoiceIds.length || invoiceIds.length > 100) {
+    return { success: false as const, error: "Invalid selection" };
+  }
+
+  try {
+    const invoices = await prisma.invoice.findMany({
+      where: {
+        id: { in: invoiceIds },
+        status: { not: "PAID" },
+      },
+      include: {
+        payments: { where: { status: "RECEIVED" }, select: { amount: true } },
+      },
+    });
+
+    if (invoices.length === 0) {
+      return { success: false as const, error: "No eligible invoices found" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const inv of invoices) {
+        const existingPaid = inv.payments.reduce(
+          (sum, p) => sum + Number(p.amount),
+          0
+        );
+        const totalAmount = Number(inv.totalAmount);
+        const remaining = totalAmount - existingPaid;
+
+        // Create payment record for the remaining amount
+        if (remaining > 0) {
+          await tx.payment.create({
+            data: {
+              invoiceId: inv.id,
+              amount: new Prisma.Decimal(remaining.toFixed(2)),
+              date: new Date(),
+              status: "RECEIVED",
+              remarks: "Bulk marked as paid",
+            },
+          });
+        }
+
+        // Update invoice status
+        await tx.invoice.update({
+          where: { id: inv.id },
+          data: {
+            status: "PAID",
+            paidAmount: new Prisma.Decimal(totalAmount.toFixed(2)),
+            balanceDue: new Prisma.Decimal("0"),
+            updatedAt: new Date(),
+          },
+        });
+      }
+    });
+
+    // Audit log
+    await prisma.auditLog.create({
+      data: {
+        entity: "Invoice",
+        entityId: invoiceIds.join(","),
+        action: "UPDATE",
+        changes: {
+          action: `Bulk marked ${invoices.length} invoices as paid`,
+          invoiceIds: invoiceIds,
+        },
+        userId: session.user.id,
+      },
+    });
+
+    revalidatePath("/invoices");
+    return { success: true as const, count: invoices.length };
+  } catch (error) {
+    console.error("bulkMarkAsPaid error:", error);
+    return { success: false as const, error: "Failed to mark invoices as paid" };
   }
 }
 
@@ -398,13 +593,20 @@ export async function recordPayment(data: {
 
     // Recalculate total payments to auto-update status
     const totalPaid = existingPaid + validated.amount;
+    const totalAmount = Number(invoice.totalAmount);
 
     const newStatus: "PAID" | "PARTIALLY_PAID" =
-      totalPaid >= Number(invoice.totalAmount) ? "PAID" : "PARTIALLY_PAID";
+      totalPaid >= totalAmount ? "PAID" : "PARTIALLY_PAID";
 
     await prisma.invoice.update({
       where: { id: validated.invoiceId },
-      data: { status: newStatus },
+      data: {
+        status: newStatus,
+        paidAmount: new Prisma.Decimal(totalPaid.toFixed(2)),
+        balanceDue: new Prisma.Decimal(
+          Math.max(0, totalAmount - totalPaid).toFixed(2)
+        ),
+      },
     });
 
     await prisma.auditLog.create({

@@ -24,11 +24,9 @@ enum UnitType {
 }
 
 enum InvoiceStatus {
-  DRAFT
-  SENT
+  UNPAID
   PARTIALLY_PAID
   PAID
-  CANCELLED
 }
 
 enum PaymentMode {
@@ -245,7 +243,7 @@ model Invoice {
   totalAmount       Decimal       @db.Decimal(12, 2)
   paidAmount        Decimal       @default(0) @db.Decimal(12, 2)
   balanceDue        Decimal       @default(0) @db.Decimal(12, 2)
-  status            InvoiceStatus @default(DRAFT)
+  status            InvoiceStatus @default(UNPAID)
   dcNumber          String?
   gatePassNumber    String?
   gatePassDate      DateTime?

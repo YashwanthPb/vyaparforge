@@ -23,13 +23,9 @@ import type { InvoiceData } from "@/components/invoice-templates/types";
 export const dynamic = "force-dynamic";
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-  DRAFT: {
-    label: "Draft",
-    className: "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
-  },
-  SENT: {
-    label: "Sent",
-    className: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+  UNPAID: {
+    label: "Unpaid",
+    className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   },
   PARTIALLY_PAID: {
     label: "Partially Paid",
@@ -40,10 +36,6 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     label: "Paid",
     className:
       "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
-  },
-  CANCELLED: {
-    label: "Cancelled",
-    className: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
   },
 };
 
@@ -83,22 +75,22 @@ export default async function InvoiceDetailPage({
   const invoiceData: InvoiceData = {
     invoiceNumber: invoice.invoiceNumber,
     date: format(new Date(invoice.date), "dd-MM-yyyy"),
-    poReference: invoice.purchaseOrder.poNumber,
+    poReference: invoice.purchaseOrder?.poNumber ?? "",
     deliveryNote: "",
     placeOfSupply: `${DEFAULT_BUYER.state} (${DEFAULT_BUYER.stateCode})`,
     seller: DEFAULT_SELLER,
     buyer: {
       ...DEFAULT_BUYER,
-      division: invoice.purchaseOrder.division.name,
+      division: invoice.purchaseOrder?.division.name ?? "",
     },
     items: invoice.items.map((item, index) => ({
       sno: index + 1,
-      partNumber: item.poLineItem.partNumber,
-      description: item.poLineItem.partName,
+      partNumber: item.poLineItem?.partNumber ?? "",
+      description: item.poLineItem?.partName ?? "",
       hsnSac: "7326",
-      workOrder: item.poLineItem.workOrder,
+      workOrder: item.poLineItem?.workOrder ?? "",
       qty: Number(item.qty),
-      unit: item.poLineItem.unit,
+      unit: item.poLineItem?.unit ?? "",
       rate: Number(item.rate),
       amount: Number(item.amount),
     })),
@@ -126,8 +118,8 @@ export default async function InvoiceDetailPage({
             </Badge>
           </div>
           <p className="text-muted-foreground mt-1">
-            PO: {invoice.purchaseOrder.poNumber} —{" "}
-            {invoice.purchaseOrder.division.name}
+            PO: {invoice.purchaseOrder?.poNumber ?? "N/A"} —{" "}
+            {invoice.purchaseOrder?.division.name ?? ""}
           </p>
         </div>
         <InvoiceActions invoiceId={invoice.id} status={invoice.status} />
