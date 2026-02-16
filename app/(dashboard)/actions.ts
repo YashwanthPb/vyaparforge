@@ -166,3 +166,158 @@ export async function getDivisionSummary() {
     };
   });
 }
+
+// ─── Top 5 Outstanding Parties ──────────────────────────────────────
+
+export async function getTopOutstandingParties() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const invoices = await prisma.invoice.findMany({
+    where: { status: { not: "PAID" } },
+    select: {
+      partyId: true,
+      party: { select: { name: true } },
+      totalAmount: true,
+      payments: {
+        where: { status: "RECEIVED" },
+        select: { amount: true },
+      },
+    },
+  });
+
+  const partyMap = new Map<string, { name: string; outstanding: number }>();
+
+  for (const inv of invoices) {
+    if (!inv.partyId || !inv.party) continue;
+    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+    const balance = Math.max(0, Number(inv.totalAmount) - paid);
+    const existing = partyMap.get(inv.partyId);
+    if (existing) {
+      existing.outstanding += balance;
+    } else {
+      partyMap.set(inv.partyId, { name: inv.party.name, outstanding: balance });
+    }
+  }
+
+  return Array.from(partyMap.entries())
+    .map(([id, data]) => ({ id, ...data }))
+    .sort((a, b) => b.outstanding - a.outstanding)
+    .slice(0, 5);
+}
+
+// ─── Monthly Revenue (Last 12 months) ───────────────────────────────
+
+export async function getMonthlyRevenue() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const now = new Date();
+  const twelveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
+
+  const invoices = await prisma.invoice.findMany({
+    where: {
+      date: { gte: twelveMonthsAgo },
+    },
+    select: {
+      date: true,
+      totalAmount: true,
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const monthMap = new Map<string, number>();
+  for (let i = 0; i < 12; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 11 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthMap.set(key, 0);
+  }
+
+  for (const inv of invoices) {
+    const d = new Date(inv.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    if (monthMap.has(key)) {
+      monthMap.set(key, (monthMap.get(key) ?? 0) + Number(inv.totalAmount));
+    }
+  }
+
+  return Array.from(monthMap.entries()).map(([month, revenue]) => {
+    const [y, m] = month.split("-");
+    const label = new Date(Number(y), Number(m) - 1).toLocaleDateString("en-IN", {
+      month: "short",
+      year: "2-digit",
+    });
+    return { month: label, revenue };
+  });
+}
+
+// ─── Invoice vs Payment Comparison ──────────────────────────────────
+
+export async function getInvoiceVsPayment() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const now = new Date();
+  const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+
+  const [invoices, payments] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { date: { gte: sixMonthsAgo } },
+      select: { date: true, totalAmount: true },
+    }),
+    prisma.payment.findMany({
+      where: { date: { gte: sixMonthsAgo }, status: "RECEIVED" },
+      select: { date: true, amount: true },
+    }),
+  ]);
+
+  const monthMap = new Map<string, { invoiced: number; collected: number }>();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - 5 + i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    monthMap.set(key, { invoiced: 0, collected: 0 });
+  }
+
+  for (const inv of invoices) {
+    const d = new Date(inv.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const entry = monthMap.get(key);
+    if (entry) entry.invoiced += Number(inv.totalAmount);
+  }
+
+  for (const pay of payments) {
+    const d = new Date(pay.date);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+    const entry = monthMap.get(key);
+    if (entry) entry.collected += Number(pay.amount);
+  }
+
+  return Array.from(monthMap.entries()).map(([month, data]) => {
+    const [y, m] = month.split("-");
+    const label = new Date(Number(y), Number(m) - 1).toLocaleDateString("en-IN", {
+      month: "short",
+      year: "2-digit",
+    });
+    return { month: label, ...data };
+  });
+}
+
+// ─── Overdue Invoice Count ──────────────────────────────────────────
+
+export async function getOverdueInvoiceCount() {
+  const session = await getServerSession(authOptions);
+  if (!session) return 0;
+
+  const unpaidInvoices = await prisma.invoice.findMany({
+    where: { status: { not: "PAID" } },
+    select: { date: true },
+  });
+
+  const now = new Date();
+  return unpaidInvoices.filter((inv) => {
+    const invoiceDate = new Date(inv.date);
+    const diff = now.getTime() - invoiceDate.getTime();
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+    return days > 30;
+  }).length;
+}

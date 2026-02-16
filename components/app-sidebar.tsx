@@ -14,6 +14,7 @@ import {
   Settings,
   Users,
   ShoppingCart,
+  CreditCard,
 } from "lucide-react";
 
 import {
@@ -70,6 +71,11 @@ const mainNavItems = [
     title: "Parties",
     href: "/parties",
     icon: Users,
+  },
+  {
+    title: "Credit Notes",
+    href: "/credit-notes",
+    icon: CreditCard,
   },
   {
     title: "Reports",

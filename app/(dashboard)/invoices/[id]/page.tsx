@@ -12,6 +12,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { getInvoice } from "../actions";
 import { InvoiceActions } from "./invoice-actions";
+import { PaymentReminder } from "./payment-reminder";
 import { InvoicePreview } from "./invoice-preview";
 import { amountInWords } from "@/lib/amount-in-words";
 import {
@@ -116,6 +117,16 @@ export default async function InvoiceDetailPage({
             <Badge variant="outline" className={status.className}>
               {status.label}
             </Badge>
+            {invoice.status !== "PAID" && (
+              <PaymentReminder
+                partyName={invoice.party?.name ?? "Party"}
+                invoiceNumber={invoice.invoiceNumber}
+                invoiceDate={invoice.date.toISOString()}
+                totalAmount={grandTotal}
+                balanceDue={balanceDue}
+                status={invoice.status}
+              />
+            )}
           </div>
           <p className="text-muted-foreground mt-1">
             PO: {invoice.purchaseOrder?.poNumber ?? "N/A"} —{" "}

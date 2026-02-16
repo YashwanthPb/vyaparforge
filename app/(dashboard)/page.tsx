@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import {
   FileText,
   PackageOpen,
@@ -24,8 +25,22 @@ import {
   Building2,
   TrendingUp,
   TrendingDown,
+  Plus,
+  CreditCard,
+  BarChart3,
+  AlertCircle,
 } from "lucide-react";
-import { getDashboardStats, getActivePOs, getDivisionSummary, getOutstandingStats } from "./actions";
+import {
+  getDashboardStats,
+  getActivePOs,
+  getDivisionSummary,
+  getOutstandingStats,
+  getTopOutstandingParties,
+  getMonthlyRevenue,
+  getInvoiceVsPayment,
+  getOverdueInvoiceCount,
+} from "./actions";
+import { RevenueBarChart, InvoiceVsPaymentChart } from "./dashboard-charts";
 
 export const metadata: Metadata = {
   title: "Dashboard | VyaparForge",
@@ -58,11 +73,24 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default async function DashboardPage() {
-  const [stats, activePOs, divisionSummary, outstanding] = await Promise.all([
+  const [
+    stats,
+    activePOs,
+    divisionSummary,
+    outstanding,
+    topParties,
+    monthlyRevenue,
+    invoiceVsPayment,
+    overdueCount,
+  ] = await Promise.all([
     getDashboardStats(),
     getActivePOs(),
     getDivisionSummary(),
     getOutstandingStats(),
+    getTopOutstandingParties(),
+    getMonthlyRevenue(),
+    getInvoiceVsPayment(),
+    getOverdueInvoiceCount(),
   ]);
 
   const statCards = [
@@ -88,7 +116,7 @@ export default async function DashboardPage() {
       bg: "bg-green-50 dark:bg-green-950/40",
     },
     {
-      title: "Overdue",
+      title: "Overdue POs",
       value: stats.overdue,
       icon: AlertTriangle,
       accent: "text-red-600",
@@ -106,11 +134,45 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-        <p className="text-muted-foreground">
-          Overview of your manufacturing operations for HAL.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+          <p className="text-muted-foreground">
+            Overview of your manufacturing operations for HAL.
+          </p>
+        </div>
+
+        {/* Overdue Invoices Badge */}
+        {overdueCount > 0 && (
+          <div className="flex items-center gap-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/40 px-4 py-2">
+            <AlertCircle className="h-4 w-4 text-red-600" />
+            <span className="text-sm font-medium text-red-700 dark:text-red-400">
+              {overdueCount} Overdue Invoice{overdueCount !== 1 ? "s" : ""}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* ── Quick Actions ─────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center gap-2">
+        <Button asChild size="sm">
+          <Link href="/invoices/new">
+            <Plus className="mr-2 h-4 w-4" />
+            Create Invoice
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/invoices">
+            <CreditCard className="mr-2 h-4 w-4" />
+            Record Payment
+          </Link>
+        </Button>
+        <Button asChild variant="outline" size="sm">
+          <Link href="/reports/aging-receivables">
+            <BarChart3 className="mr-2 h-4 w-4" />
+            View Aging Report
+          </Link>
+        </Button>
       </div>
 
       {/* ── Stat Cards ─────────────────────────────────────────── */}
@@ -173,6 +235,72 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ── Charts Row ─────────────────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Monthly Revenue</CardTitle>
+            <CardDescription>Last 12 months invoiced amount</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RevenueBarChart data={monthlyRevenue} title="" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Cash Flow</CardTitle>
+            <CardDescription>Invoice vs payment collection (6 months)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InvoiceVsPaymentChart data={invoiceVsPayment} />
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ── Top Outstanding Parties ────────────────────────────── */}
+      {topParties.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Top 5 Outstanding Parties</CardTitle>
+            <CardDescription>Parties with the highest unpaid amounts</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {topParties.map((party, index) => {
+                const maxOutstanding = topParties[0]?.outstanding ?? 1;
+                const widthPct = Math.max((party.outstanding / maxOutstanding) * 100, 5);
+                return (
+                  <div key={party.id} className="space-y-1">
+                    <div className="flex items-center justify-between text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-muted text-[10px] font-bold text-muted-foreground">
+                          {index + 1}
+                        </span>
+                        <Link
+                          href={`/parties/${party.id}`}
+                          className="font-medium hover:underline"
+                        >
+                          {party.name}
+                        </Link>
+                      </div>
+                      <span className="font-semibold text-red-600 dark:text-red-400">
+                        {formatCurrency(party.outstanding)}
+                      </span>
+                    </div>
+                    <div className="h-2 rounded-full bg-muted overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-red-500/70 transition-all"
+                        style={{ width: `${widthPct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Active POs Table ───────────────────────────────────── */}
       <Card>

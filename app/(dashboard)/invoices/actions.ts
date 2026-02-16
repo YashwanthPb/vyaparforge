@@ -2,7 +2,7 @@
 
 import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma, InvoiceStatus } from "@prisma/client";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import {
@@ -175,6 +175,9 @@ export async function getInvoice(id: string) {
   const invoice = await prisma.invoice.findUnique({
     where: { id: parsed.data.id },
     include: {
+      party: {
+        select: { name: true },
+      },
       purchaseOrder: {
         include: {
           division: true,
@@ -443,7 +446,7 @@ export async function updatePaymentStatus(
   try {
     await prisma.invoice.update({
       where: { id: parsed.data.invoiceId },
-      data: { status: parsed.data.status },
+      data: { status: parsed.data.status as InvoiceStatus },
     });
 
     revalidatePath("/invoices");

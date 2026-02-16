@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { format } from "date-fns";
 import { ArrowLeft } from "lucide-react";
+import { PartyStatement } from "./party-statement";
 import {
   Card,
   CardContent,
@@ -277,6 +278,9 @@ export default async function PartyDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Enhanced Party Statement */}
+      <PartyStatement partyId={party.id} />
 
       {party.invoices.length === 0 && party.purchaseInvoices.length === 0 && (
         <Card>

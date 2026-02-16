@@ -10,6 +10,8 @@ import {
   Users,
   TrendingUp,
   TrendingDown,
+  Clock,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   Card,
@@ -103,6 +105,33 @@ const reportCards = [
     icon: TrendingDown,
     color: "text-orange-600 dark:text-orange-400",
     bg: "bg-orange-50 dark:bg-orange-950",
+  },
+  {
+    title: "Receivables Aging",
+    description:
+      "Outstanding receivables grouped by party and age bucket (0-30, 31-60, 61-90, 90+ days).",
+    href: "/reports/aging-receivables",
+    icon: Clock,
+    color: "text-cyan-600 dark:text-cyan-400",
+    bg: "bg-cyan-50 dark:bg-cyan-950",
+  },
+  {
+    title: "Payables Aging",
+    description:
+      "Outstanding payables grouped by supplier and age bucket (0-30, 31-60, 61-90, 90+ days).",
+    href: "/reports/aging-payables",
+    icon: Clock,
+    color: "text-amber-600 dark:text-amber-400",
+    bg: "bg-amber-50 dark:bg-amber-950",
+  },
+  {
+    title: "GSTR-1 Export",
+    description:
+      "Export invoices in GSTR-1 format for GST filing — B2B, B2CS, and HSN summary sheets.",
+    href: "/reports/gstr1",
+    icon: FileSpreadsheet,
+    color: "text-emerald-600 dark:text-emerald-400",
+    bg: "bg-emerald-50 dark:bg-emerald-950",
   },
 ];
 
