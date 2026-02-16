@@ -5,14 +5,26 @@
  *   PartyReport.xlsx
  *   SaleReport_01_12_23_to_28_02_26.xlsx  (sheets: "Sale Report", "Item Details")
  *   PurchaseReport_01_10_23_to_16_02_26.xlsx
+ *   DeliveryChallanReport_01_04_25_to_28_02_26.xlsx
+ *   AllTransactionsReport_01_03_24_to_31_01_26.xlsx
  *
  * Import order (dependencies respected):
  *   Step 1: Parties
  *   Step 2: Sale Invoices
  *   Step 3: Invoice Items
  *   Step 4: Purchase Invoices
+ *   Step 5: Delivery Challans
+ *   Step 6: Credit Notes
  *
- * Usage: npm run import
+ * Usage:
+ *   npm run import                          # run all imports
+ *   npm run import -- --all                 # run all imports
+ *   npm run import -- --parties             # parties only
+ *   npm run import -- --sales               # sale invoices + items
+ *   npm run import -- --purchases           # purchase invoices
+ *   npm run import -- --dc                  # delivery challans
+ *   npm run import -- --creditnotes         # credit notes
+ *   npm run import -- --parties --sales     # combine flags
  */
 
 import { config } from "dotenv";
@@ -163,6 +175,28 @@ function mapInvoiceStatus(
   return "UNPAID";
 }
 
+// ─── Party lookup helper ─────────────────────────────────────────────
+
+type PartyRef = { id: string; name: string; gstin?: string | null };
+
+async function loadPartyMap(): Promise<Map<string, PartyRef>> {
+  const parties: PartyRef[] = await prisma.party.findMany({
+    select: { id: true, name: true, gstin: true },
+  });
+  return new Map(parties.map((p) => [p.name.toLowerCase(), p]));
+}
+
+function findParty(
+  partyByName: Map<string, PartyRef>,
+  name: string
+): PartyRef | undefined {
+  if (!name) return undefined;
+  return (
+    partyByName.get(name.toLowerCase()) ??
+    partyByName.get(normalizeName(name).toLowerCase())
+  );
+}
+
 // ─── Step 1: Import Parties ───────────────────────────────────────────
 
 async function importParties(filePath: string) {
@@ -280,22 +314,7 @@ async function importSaleInvoices(filePath: string) {
   let created = 0;
   let skipped = 0;
 
-  // Pre-load parties for fast lookup
-  type PartyRef = { id: string; name: string; gstin: string | null };
-  const parties: PartyRef[] = await prisma.party.findMany({
-    select: { id: true, name: true, gstin: true },
-  });
-  const partyByName = new Map<string, PartyRef>(
-    parties.map((p) => [p.name.toLowerCase(), p])
-  );
-
-  function findParty(name: string): PartyRef | undefined {
-    if (!name) return undefined;
-    return (
-      partyByName.get(name.toLowerCase()) ??
-      partyByName.get(normalizeName(name).toLowerCase())
-    );
-  }
+  const partyByName = await loadPartyMap();
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -319,8 +338,10 @@ async function importSaleInvoices(filePath: string) {
     const gatePassDateRaw = row[14];
     // row[15]: DA No. (ignore)
     const poReference = str(row[16]) || undefined;
-    const workOrderStr = str(row[17]);
-    const batchStr = str(row[18]);
+    const workOrderRef = str(row[17]) || undefined;
+    const batchNumberRef = str(row[18]) || undefined;
+    const htMgpRef = str(row[19]) || undefined;
+    const hcpMgpRef = str(row[20]) || undefined;
 
     // Parse DC number — "DC123 & 15/01/2024" → "DC123"
     const dcNumber = dcRaw
@@ -333,8 +354,6 @@ async function importSaleInvoices(filePath: string) {
     // Build remarks
     const extraParts: string[] = [];
     if (remarks0) extraParts.push(remarks0);
-    if (workOrderStr) extraParts.push(`WO: ${workOrderStr}`);
-    if (batchStr) extraParts.push(`Batch: ${batchStr}`);
     const remarks = extraParts.length ? extraParts.join(" | ") : undefined;
 
     // GST calculation — GSTIN first 2 chars = "29" → Karnataka (same state)
@@ -347,7 +366,7 @@ async function importSaleInvoices(filePath: string) {
 
     const status = mapInvoiceStatus(paymentStatusRaw);
 
-    const party = findParty(partyName);
+    const party = findParty(partyByName, partyName);
 
     // Try to link PO
     let purchaseOrderId: string | undefined;
@@ -363,7 +382,7 @@ async function importSaleInvoices(filePath: string) {
       }
     }
 
-    const updateData: Prisma.InvoiceUncheckedUpdateInput = {
+    const invoiceData = {
       date,
       partyId: party?.id ?? null,
       purchaseOrderId: purchaseOrderId ?? null,
@@ -379,33 +398,22 @@ async function importSaleInvoices(filePath: string) {
       gatePassNumber,
       gatePassDate: gatePassDate ?? null,
       paymentType,
-      remarks,
-    };
-    const createData: Prisma.InvoiceUncheckedCreateInput = {
-      invoiceNumber,
-      date,
-      partyId: party?.id ?? null,
-      purchaseOrderId: purchaseOrderId ?? null,
-      subtotal,
-      cgst,
-      sgst,
-      igst,
-      totalAmount,
-      paidAmount,
-      balanceDue,
-      status,
-      dcNumber,
-      gatePassNumber,
-      gatePassDate: gatePassDate ?? null,
-      paymentType,
+      poReference,
+      workOrderRef,
+      batchNumberRef,
+      htMgpRef,
+      hcpMgpRef,
       remarks,
     };
 
     try {
       await prisma.invoice.upsert({
         where: { invoiceNumber },
-        update: updateData,
-        create: createData,
+        update: invoiceData,
+        create: {
+          invoiceNumber,
+          ...invoiceData,
+        },
       });
       created++;
       if (created % 100 === 0)
@@ -566,18 +574,13 @@ async function importPurchaseInvoices(filePath: string) {
   const rows = sheetToArrays(wb, 0, 3);
 
   // Pre-load parties for fast lookup
-  const parties = await prisma.party.findMany({
-    select: { id: true, name: true },
-  });
-  const partyByName = new Map(parties.map((p) => [p.name.toLowerCase(), p]));
+  const partyByName = await loadPartyMap();
 
-  function findParty(name: string) {
-    if (!name) return undefined;
-    return (
-      partyByName.get(name.toLowerCase()) ??
-      partyByName.get(normalizeName(name).toLowerCase())
-    );
-  }
+  // Pre-load existing purchase invoice numbers for idempotency
+  const existingPurchaseInvoices = new Set(
+    (await prisma.purchaseInvoice.findMany({ select: { invoiceNumber: true } }))
+      .map((pi) => pi.invoiceNumber)
+  );
 
   let created = 0;
   let skipped = 0;
@@ -589,6 +592,9 @@ async function importPurchaseInvoices(filePath: string) {
     // row[1]: (Col B — not specified in mapping)
     const invoiceNumber = str(row[2]); // Col C
     if (!invoiceNumber) { skipped++; continue; }
+
+    // Idempotent: skip if already exists
+    if (existingPurchaseInvoices.has(invoiceNumber)) { skipped++; continue; }
 
     const partyName = normalizeName(str(row[3])); // Col D
     if (!partyName) { skipped++; continue; }
@@ -608,7 +614,7 @@ async function importPurchaseInvoices(filePath: string) {
     const date = parseDate(dateRaw) ?? new Date();
     const paymentStatus = mapPaymentStatus(paymentStatusRaw);
 
-    let party = findParty(partyName);
+    let party = findParty(partyByName, partyName);
 
     // Auto-create supplier if not found
     if (!party) {
@@ -645,6 +651,7 @@ async function importPurchaseInvoices(filePath: string) {
         },
       });
       created++;
+      existingPurchaseInvoices.add(invoiceNumber);
       if (created % 100 === 0)
         console.log(`  Imported ${created}/${rows.length} purchase invoices...`);
     } catch (err) {
@@ -660,6 +667,269 @@ async function importPurchaseInvoices(filePath: string) {
   );
 }
 
+// ─── Step 5: Import Delivery Challans ────────────────────────────────
+
+async function importDeliveryChallans(filePath: string) {
+  console.log(
+    `\n[Step 5] Importing delivery challans from: ${path.basename(filePath)}`
+  );
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`  ERROR: File not found: ${filePath}`);
+    return;
+  }
+
+  const wb = XLSX.readFile(filePath);
+
+  // ── Main sheet: "Delivery Challan" ──
+  const mainSheetName = wb.SheetNames.find(
+    (n) => n.toLowerCase().includes("delivery challan")
+  ) ?? wb.SheetNames[0];
+
+  // Headers at row 3 (index 2), data from row 4 (index 3)
+  const mainRows = sheetToObjects(wb, mainSheetName, 2, 3);
+
+  // ── Item Details sheet ──
+  const itemSheetName = wb.SheetNames.find((n) =>
+    n.toLowerCase().includes("item")
+  );
+  let itemRows: Record<string, unknown>[] = [];
+  if (itemSheetName) {
+    // Headers at row 3 (index 2), data from row 4 (index 3)
+    itemRows = sheetToObjects(wb, itemSheetName, 2, 3);
+  }
+
+  // Group items by DC reference number (Invoice No./Txn No.)
+  const itemsByDC = new Map<string, Record<string, unknown>[]>();
+  for (const item of itemRows) {
+    const dcNo = str(item["Invoice No./Txn No."]);
+    if (!dcNo) continue;
+    if (!itemsByDC.has(dcNo)) itemsByDC.set(dcNo, []);
+    itemsByDC.get(dcNo)!.push(item);
+  }
+
+  const partyByName = await loadPartyMap();
+
+  // Pre-load existing DCs for idempotency
+  const existingDCs = new Set(
+    (await prisma.deliveryChallan.findMany({ select: { dcNumber: true } }))
+      .map((dc) => dc.dcNumber)
+  );
+
+  let created = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < mainRows.length; i++) {
+    const row = mainRows[i];
+    const dcNumber = str(row["Reference No"]);
+    if (!dcNumber) { skipped++; continue; }
+
+    // Idempotent: skip if already exists
+    if (existingDCs.has(dcNumber)) { skipped++; continue; }
+
+    const date = parseDate(row["Date"]) ?? new Date();
+    const partyName = normalizeName(str(row["Party Name"]));
+    const totalAmount = toNum(row["Total"]);
+    const paymentType = str(row["Payment Type"]) || undefined;
+    const paidAmount = toNum(row["Paid"]);
+    const received = toNum(row["Received"]);
+    const balanceDue = toNum(row["Balance"]);
+    const status = str(row["Txn Status"]) || undefined;
+    const description = str(row["Description"]) || undefined;
+
+    const party = findParty(partyByName, partyName);
+
+    // Build item data
+    const dcItems = itemsByDC.get(dcNumber) ?? [];
+    const itemData = dcItems
+      .map((item) => {
+        const qty = toNum(item["Quantity"]);
+        const rate = toNum(item["UnitPrice"]);
+        const amount = toNum(item["Amount"]);
+        if (!qty && !amount) return null;
+        return {
+          itemName: str(item["Item Name"]) || null,
+          itemCode: str(item["Item Code"]) || null,
+          hsnCode: str(item["HSN/SAC"]) || null,
+          partName: str(item["Part Name"]) || null,
+          challanOrderNo: str(item["Challan/Order No."]) || null,
+          qty,
+          unit: str(item["Unit"]) || null,
+          rate,
+          discountPercent: toNum(item["Discount Percent"]),
+          discount: toNum(item["Discount"]),
+          amount,
+        };
+      })
+      .filter(Boolean) as Prisma.DeliveryChallanItemCreateWithoutDeliveryChallanInput[];
+
+    try {
+      await prisma.deliveryChallan.create({
+        data: {
+          dcNumber,
+          date,
+          partyId: party?.id ?? null,
+          totalAmount,
+          paymentType,
+          paidAmount,
+          balanceDue,
+          status,
+          description,
+          items: itemData.length > 0 ? { create: itemData } : undefined,
+        },
+      });
+      created++;
+      existingDCs.add(dcNumber);
+      if (created % 50 === 0)
+        console.log(`  Imported ${created}/${mainRows.length} delivery challans...`);
+    } catch (err) {
+      console.error(
+        `  Row ${i + 4}: Failed to create DC "${dcNumber}": ${err}`
+      );
+      skipped++;
+    }
+  }
+
+  console.log(
+    `  Done — ${created} delivery challans created, ${skipped} skipped`
+  );
+}
+
+// ─── Step 6: Import Credit Notes ─────────────────────────────────────
+
+async function importCreditNotes(filePath: string) {
+  console.log(
+    `\n[Step 6] Importing credit notes from: ${path.basename(filePath)}`
+  );
+
+  if (!fs.existsSync(filePath)) {
+    console.error(`  ERROR: File not found: ${filePath}`);
+    return;
+  }
+
+  const wb = XLSX.readFile(filePath);
+
+  // ── Main sheet: "Custom Report" ──
+  const mainSheetName = wb.SheetNames.find(
+    (n) => n.toLowerCase().includes("custom report")
+  ) ?? wb.SheetNames[0];
+
+  // Headers at row 1 (index 0), data from row 2 (index 1)
+  const allRows = sheetToObjects(wb, mainSheetName, 0, 1);
+
+  // Filter only Credit Note rows
+  const mainRows = allRows.filter(
+    (row) => str(row["Type"]).toLowerCase() === "credit note"
+  );
+  console.log(
+    `  Found ${mainRows.length} credit note rows out of ${allRows.length} total`
+  );
+
+  // ── Item Details sheet ──
+  const itemSheetName = wb.SheetNames.find((n) =>
+    n.toLowerCase().includes("item")
+  );
+  let itemRows: Record<string, unknown>[] = [];
+  if (itemSheetName) {
+    // Headers at row 1 (index 0), data from row 2 (index 1)
+    // Note: AllTransactionsReport item details may have headers at row 1
+    itemRows = sheetToObjects(wb, itemSheetName, 0, 1);
+  }
+
+  // Group items by credit note reference number
+  const itemsByCN = new Map<string, Record<string, unknown>[]>();
+  for (const item of itemRows) {
+    const cnNo = str(item["Invoice No./Txn No."]);
+    if (!cnNo) continue;
+    if (!itemsByCN.has(cnNo)) itemsByCN.set(cnNo, []);
+    itemsByCN.get(cnNo)!.push(item);
+  }
+
+  const partyByName = await loadPartyMap();
+
+  // Pre-load existing credit notes for idempotency
+  const existingCNs = new Set(
+    (await prisma.creditNote.findMany({ select: { creditNoteNumber: true } }))
+      .map((cn) => cn.creditNoteNumber)
+  );
+
+  let created = 0;
+  let skipped = 0;
+
+  for (let i = 0; i < mainRows.length; i++) {
+    const row = mainRows[i];
+    const creditNoteNumber = str(row["Reference No"]);
+    if (!creditNoteNumber) { skipped++; continue; }
+
+    // Idempotent: skip if already exists
+    if (existingCNs.has(creditNoteNumber)) { skipped++; continue; }
+
+    const date = parseDate(row["Date"]) ?? new Date();
+    const partyName = normalizeName(str(row["Party Name"]));
+    const totalAmount = toNum(row["Total"]);
+    const description = str(row["Description"]) || undefined;
+
+    const party = findParty(partyByName, partyName);
+
+    // Build item data
+    const cnItems = itemsByCN.get(creditNoteNumber) ?? [];
+    const itemData = cnItems
+      .map((item) => {
+        const qty = toNum(item["Quantity"]);
+        const rate = toNum(item["UnitPrice"]);
+        const amount = toNum(item["Amount"]);
+        if (!qty && !amount) return null;
+        return {
+          itemName: str(item["Item Name"]) || null,
+          partName: str(item["Part Name"]) || null,
+          hsnCode: str(item["HSN/SAC"]) || null,
+          qty,
+          rate,
+          amount,
+        };
+      })
+      .filter(Boolean) as Prisma.CreditNoteItemCreateWithoutCreditNoteInput[];
+
+    try {
+      await prisma.creditNote.create({
+        data: {
+          creditNoteNumber,
+          date,
+          partyId: party?.id ?? null,
+          totalAmount,
+          reason: description,
+          status: "PENDING",
+          items: itemData.length > 0 ? { create: itemData } : undefined,
+        },
+      });
+      created++;
+      existingCNs.add(creditNoteNumber);
+      if (created % 50 === 0)
+        console.log(`  Imported ${created}/${mainRows.length} credit notes...`);
+    } catch (err) {
+      console.error(
+        `  Row ${i + 2}: Failed to create credit note "${creditNoteNumber}": ${err}`
+      );
+      skipped++;
+    }
+  }
+
+  console.log(
+    `  Done — ${created} credit notes created, ${skipped} skipped`
+  );
+}
+
+// ─── CLI Flag Parsing ─────────────────────────────────────────────────
+
+function hasFlag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
+function getArg(name: string): string | undefined {
+  const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
+  return arg ? arg.split("=").slice(1).join("=") : undefined;
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────
 
 async function main() {
@@ -667,33 +937,38 @@ async function main() {
   console.log(`Data directory: ${DATA_DIR}`);
 
   if (!fs.existsSync(DATA_DIR)) {
-    console.error(`ERROR: Data directory not found: ${DATA_DIR}`);
-    console.error("Create the directory and place Excel files there:");
-    console.error("  scripts/data/PartyReport.xlsx");
-    console.error(
-      "  scripts/data/SaleReport_01_12_23_to_28_02_26.xlsx"
-    );
-    console.error(
-      "  scripts/data/PurchaseReport_01_10_23_to_16_02_26.xlsx"
-    );
-    process.exit(1);
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    console.log(`  Created data directory: ${DATA_DIR}`);
   }
 
-  // Allow CLI overrides: --parties=file.xlsx etc.
-  function getArg(name: string): string | undefined {
-    const arg = process.argv.find((a) => a.startsWith(`--${name}=`));
-    return arg ? arg.split("=").slice(1).join("=") : undefined;
-  }
+  // Determine which steps to run
+  const flagParties = hasFlag("parties");
+  const flagSales = hasFlag("sales");
+  const flagPurchases = hasFlag("purchases");
+  const flagDC = hasFlag("dc");
+  const flagCreditNotes = hasFlag("creditnotes");
+  const flagAll = hasFlag("all");
 
+  // If no flags specified, run all
+  const noFlags = !flagParties && !flagSales && !flagPurchases && !flagDC && !flagCreditNotes && !flagAll;
+  const runAll = flagAll || noFlags;
+
+  // File paths (allow CLI overrides via --parties=file.xlsx etc.)
   const partiesFile =
     getArg("parties") ??
     path.join(DATA_DIR, "PartyReport.xlsx");
   const saleFile =
-    getArg("sale") ??
+    getArg("sales") ??
     path.join(DATA_DIR, "SaleReport_01_12_23_to_28_02_26.xlsx");
   const purchaseFile =
-    getArg("purchase") ??
+    getArg("purchases") ??
     path.join(DATA_DIR, "PurchaseReport_01_10_23_to_16_02_26.xlsx");
+  const dcFile =
+    getArg("dc") ??
+    path.join(DATA_DIR, "DeliveryChallanReport_01_04_25_to_28_02_26.xlsx");
+  const creditNotesFile =
+    getArg("creditnotes") ??
+    path.join(DATA_DIR, "AllTransactionsReport_01_03_24_to_31_01_26.xlsx");
 
   // Load divisions for HAL party matching
   await loadDivisions();
@@ -702,16 +977,34 @@ async function main() {
   );
 
   // Step 1
-  await importParties(partiesFile);
+  if (runAll || flagParties) {
+    await importParties(partiesFile);
+  }
 
   // Step 2
-  await importSaleInvoices(saleFile);
+  if (runAll || flagSales) {
+    await importSaleInvoices(saleFile);
+  }
 
   // Step 3 — items link to invoices created in step 2
-  await importInvoiceItems(saleFile);
+  if (runAll || flagSales) {
+    await importInvoiceItems(saleFile);
+  }
 
   // Step 4
-  await importPurchaseInvoices(purchaseFile);
+  if (runAll || flagPurchases) {
+    await importPurchaseInvoices(purchaseFile);
+  }
+
+  // Step 5
+  if (runAll || flagDC) {
+    await importDeliveryChallans(dcFile);
+  }
+
+  // Step 6
+  if (runAll || flagCreditNotes) {
+    await importCreditNotes(creditNotesFile);
+  }
 
   console.log("\n=== Import complete ===\n");
 }
