@@ -7,6 +7,9 @@ import {
   Receipt,
   Building2,
   IndianRupee,
+  Users,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
 import {
   Card,
@@ -73,6 +76,33 @@ const reportCards = [
     icon: IndianRupee,
     color: "text-red-600 dark:text-red-400",
     bg: "bg-red-50 dark:bg-red-950",
+  },
+  {
+    title: "Party Ledger",
+    description:
+      "View all transactions per party — sales, purchases, and running balance.",
+    href: "/reports/party-ledger",
+    icon: Users,
+    color: "text-indigo-600 dark:text-indigo-400",
+    bg: "bg-indigo-50 dark:bg-indigo-950",
+  },
+  {
+    title: "Outstanding Receivables",
+    description:
+      "All unpaid sale invoices sorted by oldest — what customers owe you.",
+    href: "/reports/outstanding-receivables",
+    icon: TrendingUp,
+    color: "text-blue-600 dark:text-blue-400",
+    bg: "bg-blue-50 dark:bg-blue-950",
+  },
+  {
+    title: "Outstanding Payables",
+    description:
+      "All unpaid purchase invoices sorted by oldest — what you owe suppliers.",
+    href: "/reports/outstanding-payables",
+    icon: TrendingDown,
+    color: "text-orange-600 dark:text-orange-400",
+    bg: "bg-orange-50 dark:bg-orange-950",
   },
 ];
 

@@ -370,3 +370,227 @@ export async function getOutstandingPayments() {
     daysOverdue: number;
   }[];
 }
+
+// ─── Party Ledger ────────────────────────────────────────────────────
+
+export async function getPartyLedger(partyId?: string) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { parties: [], transactions: [] };
+
+  const parties = await prisma.party.findMany({
+    select: { id: true, name: true, type: true },
+    orderBy: { name: "asc" },
+  });
+
+  if (!partyId) {
+    return { parties, transactions: [] };
+  }
+
+  const party = await prisma.party.findUnique({
+    where: { id: partyId },
+    select: { id: true, name: true },
+  });
+
+  if (!party) return { parties, transactions: [] };
+
+  const [invoices, purchaseInvoices] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { partyId },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        date: true,
+        totalAmount: true,
+        paidAmount: true,
+        status: true,
+        payments: { where: { status: "RECEIVED" }, select: { amount: true } },
+      },
+      orderBy: { date: "asc" },
+    }),
+    prisma.purchaseInvoice.findMany({
+      where: { partyId },
+      select: {
+        id: true,
+        invoiceNumber: true,
+        date: true,
+        totalAmount: true,
+        paidAmount: true,
+        paymentStatus: true,
+      },
+      orderBy: { date: "asc" },
+    }),
+  ]);
+
+  type Transaction = {
+    id: string;
+    date: string;
+    reference: string;
+    type: "SALE" | "PURCHASE";
+    debit: number;
+    credit: number;
+    balance: number;
+  };
+
+  const transactions: Transaction[] = [];
+
+  // Sales increase receivable (debit customer)
+  for (const inv of invoices) {
+    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+    transactions.push({
+      id: inv.id,
+      date: inv.date.toISOString(),
+      reference: inv.invoiceNumber,
+      type: "SALE",
+      debit: Number(inv.totalAmount),
+      credit: paid,
+      balance: 0,
+    });
+  }
+
+  // Purchases increase payable (credit supplier)
+  for (const inv of purchaseInvoices) {
+    transactions.push({
+      id: inv.id,
+      date: inv.date.toISOString(),
+      reference: inv.invoiceNumber,
+      type: "PURCHASE",
+      debit: Number(inv.paidAmount),
+      credit: Number(inv.totalAmount),
+      balance: 0,
+    });
+  }
+
+  // Sort by date
+  transactions.sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+
+  // Compute running balance (debit - credit, positive = we owe / they owe us)
+  let running = 0;
+  for (const t of transactions) {
+    running += t.debit - t.credit;
+    t.balance = running;
+  }
+
+  return { parties, transactions, partyName: party.name };
+}
+
+// ─── Outstanding Receivables ─────────────────────────────────────────
+
+export async function getOutstandingReceivables() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const invoices = await prisma.invoice.findMany({
+    where: { status: { notIn: ["PAID", "CANCELLED"] } },
+    include: {
+      party: { select: { name: true } },
+      purchaseOrder: {
+        select: {
+          poNumber: true,
+          division: { select: { name: true } },
+        },
+      },
+      payments: { where: { status: "RECEIVED" }, select: { amount: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const now = new Date();
+
+  return invoices
+    .map((inv) => {
+      const totalPaid = inv.payments.reduce(
+        (sum, p) => sum + Number(p.amount),
+        0
+      );
+      const outstandingAmount = Number(inv.totalAmount) - totalPaid;
+      if (outstandingAmount <= 0) return null;
+
+      const daysOverdue = Math.max(
+        0,
+        Math.floor(
+          (now.getTime() - inv.date.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date.toISOString(),
+        partyName: inv.party?.name ?? "—",
+        poNumber: inv.purchaseOrder?.poNumber ?? "—",
+        division: inv.purchaseOrder?.division.name ?? "—",
+        totalAmount: Number(inv.totalAmount),
+        paidAmount: totalPaid,
+        outstandingAmount,
+        daysOverdue,
+      };
+    })
+    .filter(Boolean) as {
+    id: string;
+    invoiceNumber: string;
+    date: string;
+    partyName: string;
+    poNumber: string;
+    division: string;
+    totalAmount: number;
+    paidAmount: number;
+    outstandingAmount: number;
+    daysOverdue: number;
+  }[];
+}
+
+// ─── Outstanding Payables ────────────────────────────────────────────
+
+export async function getOutstandingPayables() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const invoices = await prisma.purchaseInvoice.findMany({
+    where: { paymentStatus: { not: "PAID" } },
+    include: {
+      party: { select: { name: true } },
+    },
+    orderBy: { date: "asc" },
+  });
+
+  const now = new Date();
+
+  return invoices
+    .map((inv) => {
+      if (Number(inv.balanceDue) <= 0) return null;
+
+      const daysOverdue = Math.max(
+        0,
+        Math.floor(
+          (now.getTime() - inv.date.getTime()) / (1000 * 60 * 60 * 24)
+        )
+      );
+
+      return {
+        id: inv.id,
+        invoiceNumber: inv.invoiceNumber,
+        date: inv.date.toISOString(),
+        supplierName: inv.party.name,
+        poNumber: inv.poNumber ?? "—",
+        totalAmount: Number(inv.totalAmount),
+        paidAmount: Number(inv.paidAmount),
+        balanceDue: Number(inv.balanceDue),
+        paymentStatus: inv.paymentStatus,
+        daysOverdue,
+      };
+    })
+    .filter(Boolean) as {
+    id: string;
+    invoiceNumber: string;
+    date: string;
+    supplierName: string;
+    poNumber: string;
+    totalAmount: number;
+    paidAmount: number;
+    balanceDue: number;
+    paymentStatus: string;
+    daysOverdue: number;
+  }[];
+}

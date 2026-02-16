@@ -12,6 +12,8 @@ import {
   BookOpen,
   BarChart3,
   Settings,
+  Users,
+  ShoppingCart,
 } from "lucide-react";
 
 import {
@@ -55,9 +57,19 @@ const mainNavItems = [
     icon: Receipt,
   },
   {
+    title: "Purchases",
+    href: "/purchases",
+    icon: ShoppingCart,
+  },
+  {
     title: "PO Ledger",
     href: "/po-ledger",
     icon: BookOpen,
+  },
+  {
+    title: "Parties",
+    href: "/parties",
+    icon: Users,
   },
   {
     title: "Reports",

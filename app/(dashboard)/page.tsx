@@ -22,8 +22,10 @@ import {
   Truck,
   AlertTriangle,
   Building2,
+  TrendingUp,
+  TrendingDown,
 } from "lucide-react";
-import { getDashboardStats, getActivePOs, getDivisionSummary } from "./actions";
+import { getDashboardStats, getActivePOs, getDivisionSummary, getOutstandingStats } from "./actions";
 
 export const metadata: Metadata = {
   title: "Dashboard | VyaparForge",
@@ -56,10 +58,11 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default async function DashboardPage() {
-  const [stats, activePOs, divisionSummary] = await Promise.all([
+  const [stats, activePOs, divisionSummary, outstanding] = await Promise.all([
     getDashboardStats(),
     getActivePOs(),
     getDivisionSummary(),
+    getOutstandingStats(),
   ]);
 
   const statCards = [
@@ -93,6 +96,14 @@ export default async function DashboardPage() {
     },
   ];
 
+  function formatCurrency(value: number): string {
+    return new Intl.NumberFormat("en-IN", {
+      style: "currency",
+      currency: "INR",
+      maximumFractionDigits: 0,
+    }).format(value);
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -121,6 +132,46 @@ export default async function DashboardPage() {
             </CardContent>
           </Card>
         ))}
+      </div>
+
+      {/* ── Financials ─────────────────────────────────────────── */}
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Outstanding Receivables
+            </CardTitle>
+            <div className="rounded-md p-2 bg-blue-50 dark:bg-blue-950/40">
+              <TrendingUp className="h-4 w-4 text-blue-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-blue-700 dark:text-blue-400">
+              {formatCurrency(outstanding.receivables)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Unpaid sale invoices
+            </p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">
+              Outstanding Payables
+            </CardTitle>
+            <div className="rounded-md p-2 bg-orange-50 dark:bg-orange-950/40">
+              <TrendingDown className="h-4 w-4 text-orange-600" />
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="text-3xl font-bold text-orange-700 dark:text-orange-400">
+              {formatCurrency(outstanding.payables)}
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              Unpaid purchase invoices
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* ── Active POs Table ───────────────────────────────────── */}

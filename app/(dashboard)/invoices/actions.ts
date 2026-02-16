@@ -25,6 +25,7 @@ export async function getInvoices() {
           division: { select: { name: true } },
         },
       },
+      party: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
   });
@@ -33,14 +34,18 @@ export async function getInvoices() {
     id: inv.id,
     invoiceNumber: inv.invoiceNumber,
     date: inv.date,
-    poNumber: inv.purchaseOrder.poNumber,
-    divisionName: inv.purchaseOrder.division.name,
+    poNumber: inv.purchaseOrder?.poNumber ?? "",
+    divisionName: inv.purchaseOrder?.division.name ?? "",
+    partyId: inv.party?.id ?? "",
+    partyName: inv.party?.name ?? "",
     subtotal: Number(inv.subtotal),
     cgst: Number(inv.cgst),
     sgst: Number(inv.sgst),
     igst: Number(inv.igst),
     totalAmount: Number(inv.totalAmount),
     status: inv.status,
+    dcNumber: inv.dcNumber ?? "",
+    gatePassNumber: inv.gatePassNumber ?? "",
   }));
 }
 

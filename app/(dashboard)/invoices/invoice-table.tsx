@@ -22,12 +22,16 @@ type InvoiceRow = {
   date: Date;
   poNumber: string;
   divisionName: string;
+  partyId: string;
+  partyName: string;
   subtotal: number;
   cgst: number;
   sgst: number;
   igst: number;
   totalAmount: number;
   status: "DRAFT" | "SENT" | "PARTIALLY_PAID" | "PAID" | "CANCELLED";
+  dcNumber: string;
+  gatePassNumber: string;
 };
 
 const statusConfig: Record<
@@ -78,7 +82,10 @@ export function InvoiceTable({
     (inv) =>
       inv.invoiceNumber.toLowerCase().includes(search.toLowerCase()) ||
       inv.poNumber.toLowerCase().includes(search.toLowerCase()) ||
-      inv.divisionName.toLowerCase().includes(search.toLowerCase())
+      inv.divisionName.toLowerCase().includes(search.toLowerCase()) ||
+      inv.partyName.toLowerCase().includes(search.toLowerCase()) ||
+      inv.dcNumber.toLowerCase().includes(search.toLowerCase()) ||
+      inv.gatePassNumber.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -87,7 +94,7 @@ export function InvoiceTable({
         <div className="relative max-w-sm flex-1">
           <Search className="text-muted-foreground absolute top-1/2 left-3 size-4 -translate-y-1/2" />
           <Input
-            placeholder="Search by invoice, PO or division..."
+            placeholder="Search by invoice, PO, party, DC, gate pass..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="pl-9"
@@ -107,6 +114,9 @@ export function InvoiceTable({
               <TableHead>Date</TableHead>
               <TableHead>PO Number</TableHead>
               <TableHead>Division</TableHead>
+              <TableHead>Party</TableHead>
+              <TableHead>DC Number</TableHead>
+              <TableHead>Gate Pass</TableHead>
               <TableHead className="text-right">Subtotal</TableHead>
               <TableHead className="text-right">GST</TableHead>
               <TableHead className="text-right">Total</TableHead>
@@ -117,7 +127,7 @@ export function InvoiceTable({
             {filtered.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={8}
+                  colSpan={11}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {search
@@ -141,8 +151,29 @@ export function InvoiceTable({
                     <TableCell>
                       {format(new Date(inv.date), "dd-MM-yyyy")}
                     </TableCell>
-                    <TableCell>{inv.poNumber}</TableCell>
-                    <TableCell>{inv.divisionName}</TableCell>
+                    <TableCell>{inv.poNumber || "—"}</TableCell>
+                    <TableCell>{inv.divisionName || "—"}</TableCell>
+                    <TableCell>
+                      {inv.partyName ? (
+                        <span
+                          className="hover:underline text-blue-700 dark:text-blue-400"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            router.push(`/parties/${inv.partyId}`);
+                          }}
+                        >
+                          {inv.partyName}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {inv.dcNumber || "—"}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {inv.gatePassNumber || "—"}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(inv.subtotal)}
                     </TableCell>

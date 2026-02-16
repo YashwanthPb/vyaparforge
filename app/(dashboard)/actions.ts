@@ -92,6 +92,36 @@ export async function getActivePOs() {
   });
 }
 
+// ─── Outstanding Stats ──────────────────────────────────────────────
+
+export async function getOutstandingStats() {
+  const session = await getServerSession(authOptions);
+  if (!session) return { receivables: 0, payables: 0 };
+
+  const [unpaidInvoices, unpaidPurchases] = await Promise.all([
+    prisma.invoice.findMany({
+      where: { status: { notIn: ["PAID", "CANCELLED"] } },
+      select: {
+        totalAmount: true,
+        payments: { where: { status: "RECEIVED" }, select: { amount: true } },
+      },
+    }),
+    prisma.purchaseInvoice.aggregate({
+      _sum: { balanceDue: true },
+      where: { paymentStatus: { not: "PAID" } },
+    }),
+  ]);
+
+  const receivables = unpaidInvoices.reduce((sum, inv) => {
+    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
+    return sum + Math.max(0, Number(inv.totalAmount) - paid);
+  }, 0);
+
+  const payables = Number(unpaidPurchases._sum.balanceDue ?? 0);
+
+  return { receivables, payables };
+}
+
 // ─── Division Summary ───────────────────────────────────────────────
 
 export async function getDivisionSummary() {
