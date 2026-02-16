@@ -18,6 +18,7 @@ const HAL_DIVISIONS = [
   { name: "Avionics Division", code: "AVD" },
   { name: "Foundry & Forge Division", code: "FFD" },
   { name: "LRDE (Electronics & Radar)", code: "LRDE" },
+  { name: "LCA-Tejas Division", code: "LCA" },
 ];
 
 async function main() {

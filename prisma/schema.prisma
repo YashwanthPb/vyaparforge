@@ -56,6 +56,18 @@ enum UserRole {
   USER
 }
 
+enum PartyType {
+  CUSTOMER
+  SUPPLIER
+  BOTH
+}
+
+enum PurchaseInvoiceStatus {
+  UNPAID
+  PARTIALLY_PAID
+  PAID
+}
+
 // ─── User ────────────────────────────────────────────────────────────
 
 model User {
@@ -80,6 +92,38 @@ model Division {
   updatedAt DateTime @updatedAt
 
   purchaseOrders PurchaseOrder[]
+  parties        Party[]
+}
+
+// ─── Party ───────────────────────────────────────────────────────────
+
+model Party {
+  id                String    @id @default(cuid())
+  name              String    @unique
+  gstin             String?
+  phone             String?
+  email             String?
+  address           String?
+  state             String?
+  stateCode         String?
+  type              PartyType @default(BOTH)
+  receivableBalance Decimal   @default(0) @db.Decimal(14, 2)
+  payableBalance    Decimal   @default(0) @db.Decimal(14, 2)
+  creditLimit       Decimal?  @db.Decimal(14, 2)
+  isHAL             Boolean   @default(false)
+  divisionId        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  division         Division?         @relation(fields: [divisionId], references: [id])
+  purchaseOrders   PurchaseOrder[]
+  invoices         Invoice[]
+  purchaseInvoices PurchaseInvoice[]
+
+  @@index([type])
+  @@index([isHAL])
+  @@index([divisionId])
 }
 
 // ─── Purchase Order ──────────────────────────────────────────────────
@@ -90,6 +134,7 @@ model PurchaseOrder {
   date         DateTime
   deliveryDate DateTime?
   divisionId   String
+  partyId      String?
   status       POStatus @default(OPEN)
   remarks      String?
 
@@ -97,12 +142,14 @@ model PurchaseOrder {
   updatedAt DateTime @updatedAt
 
   division          Division          @relation(fields: [divisionId], references: [id])
+  party             Party?            @relation(fields: [partyId], references: [id])
   lineItems         POLineItem[]
   inwardGatePasses  InwardGatePass[]
   outwardGatePasses OutwardGatePass[]
   invoices          Invoice[]
 
   @@index([divisionId])
+  @@index([partyId])
   @@index([status])
 }
 
@@ -188,45 +235,87 @@ model Invoice {
   id                String        @id @default(cuid())
   invoiceNumber     String        @unique
   date              DateTime
-  purchaseOrderId   String
+  purchaseOrderId   String?
+  partyId           String?
   outwardGatePassId String?       @unique
   subtotal          Decimal       @db.Decimal(12, 2)
   cgst              Decimal       @default(0) @db.Decimal(12, 2)
   sgst              Decimal       @default(0) @db.Decimal(12, 2)
   igst              Decimal       @default(0) @db.Decimal(12, 2)
   totalAmount       Decimal       @db.Decimal(12, 2)
+  paidAmount        Decimal       @default(0) @db.Decimal(12, 2)
+  balanceDue        Decimal       @default(0) @db.Decimal(12, 2)
   status            InvoiceStatus @default(DRAFT)
+  dcNumber          String?
+  gatePassNumber    String?
+  gatePassDate      DateTime?
+  paymentType       String?
+  hsnCode           String?       @default("9988")
   remarks           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  purchaseOrder   PurchaseOrder    @relation(fields: [purchaseOrderId], references: [id])
+  purchaseOrder   PurchaseOrder?   @relation(fields: [purchaseOrderId], references: [id])
+  party           Party?           @relation(fields: [partyId], references: [id])
   outwardGatePass OutwardGatePass? @relation(fields: [outwardGatePassId], references: [id])
   items           InvoiceItem[]
   payments        Payment[]
 
   @@index([purchaseOrderId])
+  @@index([partyId])
   @@index([status])
 }
 
 // ─── Invoice Item ────────────────────────────────────────────────────
 
 model InvoiceItem {
-  id           String  @id @default(cuid())
+  id           String   @id @default(cuid())
   invoiceId    String
-  poLineItemId String
-  qty          Decimal @db.Decimal(12, 2)
-  rate         Decimal @db.Decimal(12, 2)
-  amount       Decimal @db.Decimal(12, 2)
+  poLineItemId String?
+  itemName     String?
+  partName     String?
+  hsnCode      String?
+  unit         String?
+  qty          Decimal  @db.Decimal(12, 2)
+  rate         Decimal  @db.Decimal(12, 2)
+  discount     Decimal  @default(0) @db.Decimal(12, 2)
+  amount       Decimal  @db.Decimal(12, 2)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  invoice    Invoice    @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  poLineItem POLineItem @relation(fields: [poLineItemId], references: [id])
+  invoice    Invoice     @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  poLineItem POLineItem? @relation(fields: [poLineItemId], references: [id])
 
   @@index([invoiceId])
+}
+
+// ─── Purchase Invoice (Materials we buy from suppliers) ──────────────
+
+model PurchaseInvoice {
+  id             String                @id @default(cuid())
+  invoiceNumber  String
+  date           DateTime
+  partyId        String
+  totalAmount    Decimal               @db.Decimal(12, 2)
+  paidAmount     Decimal               @default(0) @db.Decimal(12, 2)
+  balanceDue     Decimal               @default(0) @db.Decimal(12, 2)
+  paymentStatus  PurchaseInvoiceStatus @default(UNPAID)
+  paymentType    String?
+  description    String?
+  poNumber       String?
+  workOrder      String?
+  batchNumber    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  party Party @relation(fields: [partyId], references: [id])
+
+  @@index([partyId])
+  @@index([paymentStatus])
+  @@index([date])
 }
 
 // ─── Payment ─────────────────────────────────────────────────────────
