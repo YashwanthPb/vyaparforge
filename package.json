@@ -6,7 +6,8 @@
     "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "import": "npx tsx scripts/import-vyapar.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.1",
