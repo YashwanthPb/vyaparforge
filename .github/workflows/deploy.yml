@@ -1,18 +1,14 @@
 name: Deploy VyaparForge
-
 on:
   push:
     branches:
       - main
-
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
       - name: Execute Remote SSH commands
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -22,4 +18,25 @@ jobs:
           script: |
             cd /root/vyaparforge
             git pull origin main
-            docker compose up -d --build
+
+            # Fix prisma.config.ts for server (CommonJS for Node on server)
+            cat > prisma.config.ts << 'EOF'
+            const path = require("node:path");
+            const { defineConfig } = require("prisma/config");
+            module.exports = defineConfig({
+              schema: path.join(__dirname, "prisma", "schema.prisma"),
+            });
+            EOF
+
+            # Rebuild and restart
+            docker compose build --no-cache app
+            docker compose up -d
+
+            # Wait and verify
+            sleep 30
+            docker ps | grep vyaparforge-app
+
+            # Push any schema changes
+            source .env
+            npx prisma generate 2>/dev/null || true
+            DATABASE_URL="postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/vyaparforge" npx prisma db push --url "postgresql://postgres:${POSTGRES_PASSWORD}@127.0.0.1:5432/vyaparforge" 2>/dev/null || true
