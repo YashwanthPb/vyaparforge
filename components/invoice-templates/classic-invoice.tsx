@@ -41,7 +41,7 @@ export function ClassicInvoice({ data }: { data: InvoiceData }) {
           <div style={{ flex: 1, padding: "8px 12px" }}>
             <p style={{ fontSize: "9px", fontWeight: "bold", textTransform: "uppercase", color: "#666", marginBottom: "4px" }}>Buyer Details</p>
             <p style={{ fontWeight: "bold", fontSize: "12px" }}>{data.buyer.name}</p>
-            <p>{data.buyer.division}</p>
+            {data.buyer.division && <p>{data.buyer.division}</p>}
             <p>{data.buyer.address}, {data.buyer.city}</p>
             <p>State: {data.buyer.state} | Code: {data.buyer.stateCode}</p>
             <p><strong>GSTIN:</strong> {data.buyer.gstin}</p>
@@ -65,6 +65,16 @@ export function ClassicInvoice({ data }: { data: InvoiceData }) {
           </div>
         </div>
 
+        {/* Additional reference row */}
+        <div style={{ display: "flex", borderBottom: "1px solid #000", fontSize: "10px" }}>
+          <div style={{ flex: 1, padding: "6px 12px", borderRight: "1px solid #000" }}>
+            <strong>Work Order:</strong> {data.workOrderRef || "—"}
+          </div>
+          <div style={{ flex: 1, padding: "6px 12px" }}>
+            <strong>Batch Number:</strong> {data.batchNumberRef || "—"}
+          </div>
+        </div>
+
         {/* Items Table */}
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
@@ -75,32 +85,35 @@ export function ClassicInvoice({ data }: { data: InvoiceData }) {
               <th style={thStyle({ width: "70px" })}>HSN/SAC</th>
               <th style={thStyle({ width: "80px" })}>Work Order</th>
               <th style={thStyle({ width: "50px", textAlign: "right" })}>Qty</th>
+              <th style={thStyle({ width: "40px", textAlign: "center" })}>Unit</th>
               <th style={thStyle({ width: "75px", textAlign: "right" })}>Rate (₹)</th>
               <th style={thStyle({ width: "85px", textAlign: "right", borderRight: "none" })}>Amount (₹)</th>
             </tr>
           </thead>
           <tbody>
-            {data.items.map((item) => (
-              <tr key={item.sno}>
+            {data.items.map((item, i) => (
+              <tr key={item.sno} style={{ backgroundColor: i % 2 === 1 ? "#fafafa" : "#fff" }}>
                 <td style={tdStyle({ textAlign: "center" })}>{item.sno}</td>
                 <td style={tdStyle({ fontWeight: "bold" })}>{item.partNumber}</td>
                 <td style={tdStyle({})}>{item.description}</td>
                 <td style={tdStyle({})}>{item.hsnSac}</td>
                 <td style={tdStyle({})}>{item.workOrder || "—"}</td>
-                <td style={tdStyle({ textAlign: "right" })}>{item.qty} {item.unit}</td>
+                <td style={tdStyle({ textAlign: "right" })}>{item.qty}</td>
+                <td style={tdStyle({ textAlign: "center" })}>{item.unit}</td>
                 <td style={tdStyle({ textAlign: "right" })}>{formatINRPlain(item.rate)}</td>
                 <td style={tdStyle({ textAlign: "right", borderRight: "none" })}>{formatINRPlain(item.amount)}</td>
               </tr>
             ))}
             {/* Empty rows to fill space for short invoices */}
             {data.items.length < 5 && Array.from({ length: 5 - data.items.length }).map((_, i) => (
-              <tr key={`empty-${i}`}>
+              <tr key={`empty-${i}`} style={{ backgroundColor: (data.items.length + i) % 2 === 1 ? "#fafafa" : "#fff" }}>
                 <td style={tdStyle({ textAlign: "center" })}>&nbsp;</td>
                 <td style={tdStyle({})}>&nbsp;</td>
                 <td style={tdStyle({})}>&nbsp;</td>
                 <td style={tdStyle({})}>&nbsp;</td>
                 <td style={tdStyle({})}>&nbsp;</td>
                 <td style={tdStyle({ textAlign: "right" })}>&nbsp;</td>
+                <td style={tdStyle({ textAlign: "center" })}>&nbsp;</td>
                 <td style={tdStyle({ textAlign: "right" })}>&nbsp;</td>
                 <td style={tdStyle({ textAlign: "right", borderRight: "none" })}>&nbsp;</td>
               </tr>
@@ -177,7 +190,7 @@ export function ClassicInvoice({ data }: { data: InvoiceData }) {
           </div>
           <div style={{ flex: 1, padding: "8px 12px", textAlign: "center" }}>
             <p style={{ fontSize: "10px", fontWeight: "bold", marginBottom: "36px" }}>For {data.seller.name}</p>
-            <p style={{ borderTop: "1px dashed #999", paddingTop: "4px", fontSize: "10px" }}>Authorized Signatory</p>
+            <p style={{ borderTop: "1px dashed #999", paddingTop: "4px", fontSize: "10px" }}>Authorised Signatory</p>
           </div>
         </div>
       </div>

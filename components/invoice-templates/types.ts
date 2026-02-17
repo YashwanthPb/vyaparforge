@@ -1,4 +1,4 @@
-export type InvoiceTheme = "classic" | "modern" | "minimal";
+export type InvoiceTheme = "classic" | "modern" | "defense";
 export type DCTheme = "classic" | "modern";
 
 export interface CompanyInfo {
@@ -47,6 +47,9 @@ export interface InvoiceData {
   poReference: string;
   deliveryNote: string;
   placeOfSupply: string;
+  workOrderRef: string | null;
+  batchNumberRef: string | null;
+  status: "UNPAID" | "PARTIALLY_PAID" | "PAID";
   seller: CompanyInfo;
   buyer: BuyerInfo;
   items: InvoiceItem[];

@@ -1,10 +1,13 @@
 import { type InvoiceData, formatINRPlain } from "./types";
 
-const ACCENT = "#1A237E";
-const ACCENT_LIGHT = "#E8EAF6";
-const ACCENT_MID = "#3F51B5";
+const ACCENT = "#1a56db";
+const ACCENT_LIGHT = "#EBF0FF";
 
 export function ModernInvoice({ data }: { data: InvoiceData }) {
+  const statusLabel = data.status === "PAID" ? "PAID" : data.status === "PARTIALLY_PAID" ? "PARTIAL" : "UNPAID";
+  const statusColor = data.status === "PAID" ? "#16a34a" : data.status === "PARTIALLY_PAID" ? "#d97706" : "#dc2626";
+  const statusBg = data.status === "PAID" ? "#f0fdf4" : data.status === "PARTIALLY_PAID" ? "#fffbeb" : "#fef2f2";
+
   return (
     <div className="modern-invoice bg-white text-black" style={{ fontFamily: "'Segoe UI', 'Helvetica Neue', Arial, sans-serif", fontSize: "11px", lineHeight: 1.5 }}>
       {/* Header Bar */}
@@ -19,8 +22,23 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
             <p style={{ fontSize: "10px", margin: "2px 0 0", opacity: 0.8 }}>{data.seller.tagline}</p>
           </div>
         </div>
-        <div style={{ backgroundColor: "rgba(255,255,255,0.2)", padding: "6px 16px", borderRadius: "4px", fontSize: "13px", fontWeight: "700", letterSpacing: "1px" }}>
-          TAX INVOICE
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          {/* Status Badge */}
+          <div style={{
+            backgroundColor: statusBg,
+            color: statusColor,
+            padding: "5px 14px",
+            borderRadius: "20px",
+            fontSize: "11px",
+            fontWeight: "700",
+            letterSpacing: "0.5px",
+            border: `1px solid ${statusColor}40`
+          }}>
+            {statusLabel}
+          </div>
+          <div style={{ backgroundColor: "rgba(255,255,255,0.2)", padding: "6px 16px", borderRadius: "4px", fontSize: "13px", fontWeight: "700", letterSpacing: "1px" }}>
+            TAX INVOICE
+          </div>
         </div>
       </div>
 
@@ -28,7 +46,7 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
       <div style={{ padding: "20px 24px", border: "1px solid #e0e0e0", borderTop: "none", borderRadius: "0 0 6px 6px" }}>
         {/* Invoice meta */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px" }}>
-          <div style={{ display: "flex", gap: "24px", fontSize: "10.5px" }}>
+          <div style={{ display: "flex", gap: "24px", fontSize: "10.5px", flexWrap: "wrap" }}>
             <div>
               <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Invoice No</span>
               <p style={{ fontWeight: "600", margin: "2px 0 0", fontSize: "12px", color: ACCENT }}>{data.invoiceNumber}</p>
@@ -41,6 +59,22 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
               <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>PO Reference</span>
               <p style={{ fontWeight: "600", margin: "2px 0 0" }}>{data.poReference}</p>
             </div>
+            <div>
+              <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Delivery Note (DC)</span>
+              <p style={{ fontWeight: "600", margin: "2px 0 0" }}>{data.deliveryNote || "—"}</p>
+            </div>
+            {data.workOrderRef && (
+              <div>
+                <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Work Order</span>
+                <p style={{ fontWeight: "600", margin: "2px 0 0" }}>{data.workOrderRef}</p>
+              </div>
+            )}
+            {data.batchNumberRef && (
+              <div>
+                <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Batch Number</span>
+                <p style={{ fontWeight: "600", margin: "2px 0 0" }}>{data.batchNumberRef}</p>
+              </div>
+            )}
             <div>
               <span style={{ color: "#999", fontSize: "9px", textTransform: "uppercase", letterSpacing: "0.5px" }}>Place of Supply</span>
               <p style={{ fontWeight: "600", margin: "2px 0 0" }}>{data.placeOfSupply}</p>
@@ -62,7 +96,7 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
           <div style={{ flex: 1, border: "1px solid #e0e0e0", borderRadius: "8px", padding: "12px 16px", backgroundColor: "#fafafa" }}>
             <p style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: ACCENT, letterSpacing: "0.5px", marginBottom: "6px" }}>Bill To</p>
             <p style={{ fontWeight: "700", fontSize: "12px" }}>{data.buyer.name}</p>
-            <p style={{ color: "#555" }}>{data.buyer.division}</p>
+            {data.buyer.division && <p style={{ color: "#555" }}>{data.buyer.division}</p>}
             <p style={{ color: "#555" }}>{data.buyer.address}, {data.buyer.city}</p>
             <p style={{ color: "#555" }}>State: {data.buyer.state} ({data.buyer.stateCode})</p>
             <p style={{ marginTop: "4px" }}><strong>GSTIN:</strong> {data.buyer.gstin}</p>
@@ -78,7 +112,8 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
               <th style={modThStyle({})}>Description</th>
               <th style={modThStyle({ width: "65px" })}>HSN/SAC</th>
               <th style={modThStyle({ width: "75px" })}>Work Order</th>
-              <th style={modThStyle({ width: "50px", textAlign: "right" })}>Qty</th>
+              <th style={modThStyle({ width: "40px", textAlign: "right" })}>Qty</th>
+              <th style={modThStyle({ width: "38px", textAlign: "center" })}>Unit</th>
               <th style={modThStyle({ width: "70px", textAlign: "right" })}>Rate (₹)</th>
               <th style={modThStyle({ width: "80px", textAlign: "right" })}>Amount (₹)</th>
             </tr>
@@ -91,7 +126,8 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
                 <td style={modTdStyle({})}>{item.description}</td>
                 <td style={modTdStyle({})}>{item.hsnSac}</td>
                 <td style={modTdStyle({})}>{item.workOrder || "—"}</td>
-                <td style={modTdStyle({ textAlign: "right" })}>{item.qty} {item.unit}</td>
+                <td style={modTdStyle({ textAlign: "right" })}>{item.qty}</td>
+                <td style={modTdStyle({ textAlign: "center" })}>{item.unit}</td>
                 <td style={modTdStyle({ textAlign: "right" })}>{formatINRPlain(item.rate)}</td>
                 <td style={modTdStyle({ textAlign: "right", fontWeight: "600" })}>{formatINRPlain(item.amount)}</td>
               </tr>
@@ -153,14 +189,14 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
         {/* Bank Details */}
         <div style={{ display: "flex", gap: "16px", marginBottom: "16px", fontSize: "10px" }}>
           <div style={{ flex: 1, backgroundColor: "#fafafa", borderRadius: "6px", padding: "10px 14px", border: "1px solid #eee" }}>
-            <p style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: ACCENT_MID, marginBottom: "4px" }}>Bank Details</p>
+            <p style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: ACCENT, marginBottom: "4px" }}>Bank Details</p>
             <p><strong>Bank:</strong> {data.seller.bankName}</p>
             <p><strong>Branch:</strong> {data.seller.bankBranch}</p>
             <p><strong>A/c No:</strong> {data.seller.accountNumber}</p>
             <p><strong>IFSC:</strong> {data.seller.ifscCode}</p>
           </div>
           <div style={{ flex: 1, backgroundColor: "#fafafa", borderRadius: "6px", padding: "10px 14px", border: "1px solid #eee" }}>
-            <p style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: ACCENT_MID, marginBottom: "4px" }}>Terms & Conditions</p>
+            <p style={{ fontSize: "9px", fontWeight: "700", textTransform: "uppercase", color: ACCENT, marginBottom: "4px" }}>Terms & Conditions</p>
             <p>1. Payment due within 30 days of invoice date.</p>
             <p>2. Goods once sold will not be taken back.</p>
             <p>3. Subject to Bengaluru jurisdiction only.</p>
@@ -176,7 +212,7 @@ export function ModernInvoice({ data }: { data: InvoiceData }) {
           <div style={{ textAlign: "center" }}>
             <p style={{ fontSize: "10px", fontWeight: "600", color: ACCENT, marginBottom: "36px" }}>For {data.seller.name}</p>
             <div style={{ width: "180px", borderBottom: "1px dashed #ccc", marginBottom: "4px" }} />
-            <p style={{ fontSize: "10px", color: "#999" }}>Authorized Signatory</p>
+            <p style={{ fontSize: "10px", color: "#999" }}>Authorised Signatory</p>
           </div>
         </div>
       </div>

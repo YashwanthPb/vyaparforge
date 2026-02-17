@@ -19,7 +19,8 @@ import {
   DEFAULT_SELLER,
   DEFAULT_BUYER,
 } from "@/components/invoice-templates/types";
-import type { InvoiceData } from "@/components/invoice-templates/types";
+import type { InvoiceData, CompanyInfo } from "@/components/invoice-templates/types";
+import { getCompanyProfile } from "../../settings/actions";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,37 @@ function formatCurrency(value: number): string {
   }).format(value);
 }
 
+function buildSellerFromProfile(profile: {
+  name: string;
+  gstin: string;
+  address: string;
+  phone: string;
+  email: string;
+  state: string;
+  stateCode: string;
+}): CompanyInfo {
+  // Derive PAN from GSTIN characters 3-12 (0-indexed: indices 2–11)
+  const pan = profile.gstin.length >= 12 ? profile.gstin.substring(2, 12) : "";
+
+  return {
+    name: profile.name || DEFAULT_SELLER.name,
+    tagline: DEFAULT_SELLER.tagline,
+    address: profile.address || DEFAULT_SELLER.address,
+    city: DEFAULT_SELLER.city,
+    state: profile.state || DEFAULT_SELLER.state,
+    stateCode: profile.stateCode || DEFAULT_SELLER.stateCode,
+    pincode: DEFAULT_SELLER.pincode,
+    gstin: profile.gstin || DEFAULT_SELLER.gstin,
+    pan: pan || DEFAULT_SELLER.pan,
+    phone: profile.phone || DEFAULT_SELLER.phone,
+    email: profile.email || DEFAULT_SELLER.email,
+    bankName: DEFAULT_SELLER.bankName,
+    bankBranch: DEFAULT_SELLER.bankBranch,
+    accountNumber: DEFAULT_SELLER.accountNumber,
+    ifscCode: DEFAULT_SELLER.ifscCode,
+  };
+}
+
 export default async function InvoiceDetailPage({
   params,
 }: {
@@ -59,6 +91,12 @@ export default async function InvoiceDetailPage({
   if (!invoice) {
     notFound();
   }
+
+  // Fetch company profile from DB for seller details
+  const companyProfile = await getCompanyProfile();
+  const seller: CompanyInfo = companyProfile
+    ? buildSellerFromProfile(companyProfile)
+    : DEFAULT_SELLER;
 
   const status = statusConfig[invoice.status];
   const totalPaid = invoice.payments
@@ -72,26 +110,38 @@ export default async function InvoiceDetailPage({
   const igst = Number(invoice.igst);
   const grandTotal = Number(invoice.totalAmount);
 
+  // Build buyer info from party data and defaults
+  const buyerInfo = {
+    ...DEFAULT_BUYER,
+    name: invoice.party?.name ?? DEFAULT_BUYER.name,
+    division: invoice.purchaseOrder?.division.name ?? "",
+    address: DEFAULT_BUYER.address,
+    city: DEFAULT_BUYER.city,
+    state: DEFAULT_BUYER.state,
+    stateCode: DEFAULT_BUYER.stateCode,
+    gstin: DEFAULT_BUYER.gstin,
+  };
+
   // Build InvoiceData for templates
   const invoiceData: InvoiceData = {
     invoiceNumber: invoice.invoiceNumber,
     date: format(new Date(invoice.date), "dd-MM-yyyy"),
-    poReference: invoice.purchaseOrder?.poNumber ?? "",
-    deliveryNote: "",
-    placeOfSupply: `${DEFAULT_BUYER.state} (${DEFAULT_BUYER.stateCode})`,
-    seller: DEFAULT_SELLER,
-    buyer: {
-      ...DEFAULT_BUYER,
-      division: invoice.purchaseOrder?.division.name ?? "",
-    },
+    poReference: invoice.purchaseOrder?.poNumber ?? invoice.poReference ?? "",
+    deliveryNote: invoice.dcNumber ?? "",
+    placeOfSupply: `${buyerInfo.state} (${buyerInfo.stateCode})`,
+    workOrderRef: invoice.workOrderRef ?? null,
+    batchNumberRef: invoice.batchNumberRef ?? null,
+    status: invoice.status as "UNPAID" | "PARTIALLY_PAID" | "PAID",
+    seller,
+    buyer: buyerInfo,
     items: invoice.items.map((item, index) => ({
       sno: index + 1,
       partNumber: item.poLineItem?.partNumber ?? "",
-      description: item.poLineItem?.partName ?? "",
-      hsnSac: "7326",
+      description: item.poLineItem?.partName ?? item.partName ?? "",
+      hsnSac: item.hsnCode ?? invoice.hsnCode ?? "7326",
       workOrder: item.poLineItem?.workOrder ?? "",
       qty: Number(item.qty),
-      unit: item.poLineItem?.unit ?? "",
+      unit: item.unit ?? item.poLineItem?.unit ?? "NOS",
       rate: Number(item.rate),
       amount: Number(item.amount),
     })),

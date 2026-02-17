@@ -8,7 +8,7 @@ import type { InvoiceTheme, InvoiceData } from "@/components/invoice-templates/t
 const INVOICE_THEMES: { value: InvoiceTheme; label: string }[] = [
   { value: "classic", label: "Classic (Tally)" },
   { value: "modern", label: "Modern (Vyapar)" },
-  { value: "minimal", label: "Minimal" },
+  { value: "defense", label: "Defense (HAL)" },
 ];
 
 export function InvoicePreview({ data }: { data: InvoiceData }) {
@@ -28,7 +28,7 @@ export function InvoicePreview({ data }: { data: InvoiceData }) {
           onThemeChange={handleThemeChange}
         />
       </div>
-      <div id="printable-area" className="print:m-0 print:p-0">
+      <div id="printable-area" className="print:m-0 print:p-0" style={{ maxWidth: "210mm", margin: "0 auto" }}>
         <InvoiceRenderer data={data} theme={theme} />
       </div>
     </div>

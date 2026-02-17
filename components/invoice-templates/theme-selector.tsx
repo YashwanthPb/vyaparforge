@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Printer } from "lucide-react";
+import { Printer, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -47,11 +47,15 @@ export function ThemeSelector<T extends string>({
     [storageKey, onThemeChange]
   );
 
+  const handleDownloadPDF = useCallback(() => {
+    window.print();
+  }, []);
+
   return (
     <div className="flex items-center gap-3 print:hidden">
       <Select value={selectedTheme} onValueChange={handleChange}>
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Select theme" />
+        <SelectTrigger className="w-[180px]">
+          <SelectValue placeholder="Select template" />
         </SelectTrigger>
         <SelectContent>
           {themes.map((t) => (
@@ -64,6 +68,10 @@ export function ThemeSelector<T extends string>({
       <Button variant="outline" onClick={() => window.print()}>
         <Printer className="mr-2 size-4" />
         Print
+      </Button>
+      <Button variant="outline" onClick={handleDownloadPDF}>
+        <Download className="mr-2 size-4" />
+        Download PDF
       </Button>
     </div>
   );
