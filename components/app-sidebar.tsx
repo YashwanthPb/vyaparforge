@@ -16,6 +16,7 @@ import {
   Users,
   ShoppingCart,
   CreditCard,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -75,6 +76,12 @@ const mainNavItems = [
     href: "/purchases",
     icon: ShoppingCart,
     badgeKey: "unpaidPurchases" as keyof BadgeCounts | null,
+  },
+  {
+    title: "Payment Sync",
+    href: "/payment-sync",
+    icon: RefreshCw,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "PO Ledger",

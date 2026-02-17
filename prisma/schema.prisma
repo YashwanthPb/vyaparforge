@@ -272,6 +272,7 @@ model Invoice {
   outwardGatePass OutwardGatePass? @relation(fields: [outwardGatePassId], references: [id])
   items           InvoiceItem[]
   payments        Payment[]
+  paymentSyncs    PaymentSync[]
 
   @@index([purchaseOrderId])
   @@index([partyId])
@@ -345,6 +346,7 @@ model Payment {
   updatedAt DateTime @updatedAt
 
   invoice Invoice @relation(fields: [invoiceId], references: [id])
+  paymentSyncs PaymentSync[]
 
   @@index([invoiceId])
 }
@@ -466,4 +468,41 @@ model AuditLog {
 
   @@index([entity, entityId])
   @@index([userId])
+}
+
+// ─── Payment Sync ────────────────────────────────────────────────────
+
+enum PaymentSyncStatus {
+  MATCHED
+  UNMATCHED
+  ERROR
+  IGNORED
+}
+
+model PaymentSync {
+  id               String            @id @default(cuid())
+  invoiceNumber    String
+  netAmount        Decimal           @db.Decimal(12, 2)
+  grossAmount      Decimal           @db.Decimal(12, 2)
+  utrNumber        String
+  utrTotal         Decimal?          @db.Decimal(12, 2)
+  paymentDate      DateTime
+  division         String
+  poNumber         String?
+  tdsPercent       Decimal?          @db.Decimal(5, 2)
+  confidence       String
+  mailLink         String?
+  status           PaymentSyncStatus @default(UNMATCHED)
+  matchedInvoiceId String?
+  matchedPaymentId String?
+  syncedAt         DateTime          @default(now())
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  matchedInvoice Invoice? @relation(fields: [matchedInvoiceId], references: [id])
+  matchedPayment Payment? @relation(fields: [matchedPaymentId], references: [id])
+
+  @@index([status])
+  @@index([invoiceNumber])
+  @@index([utrNumber])
 }
