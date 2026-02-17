@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
+import { createPartySchema } from "@/lib/validations";
 
 // ─── Get all Parties ─────────────────────────────────────────────────
 
@@ -98,19 +99,22 @@ export async function createParty(data: {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false as const, error: "Unauthorized" };
 
-  if (!data.name?.trim()) {
-    return { success: false as const, error: "Name is required" };
+  // Input validation
+  const parsed = createPartySchema.safeParse(data);
+  if (!parsed.success) {
+    return { success: false as const, error: "Validation failed: " + parsed.error.issues.map((i) => i.message).join(", ") };
   }
+  const validated = parsed.data;
 
   try {
     const party = await prisma.party.create({
       data: {
-        name: data.name.trim(),
-        gstin: data.gstin?.trim() || null,
-        phone: data.phone?.trim() || null,
-        email: data.email?.trim() || null,
-        address: data.address?.trim() || null,
-        type: data.type,
+        name: validated.name,
+        gstin: validated.gstin,
+        phone: validated.phone,
+        email: validated.email,
+        address: validated.address,
+        type: validated.type,
       },
     });
     revalidatePath("/parties");

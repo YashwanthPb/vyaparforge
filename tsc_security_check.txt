@@ -1,0 +1,1 @@
+app/(dashboard)/settings/actions.ts(515,1): error TS1005: '}' expected.

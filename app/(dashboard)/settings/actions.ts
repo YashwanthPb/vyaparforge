@@ -8,8 +8,12 @@ import {
   createDivisionSchema,
   updateDivisionSchema,
   deleteDivisionSchema,
+  changePasswordSchema,
 } from "@/lib/validations";
 import bcrypt from "bcryptjs";
+
+
+
 
 type DivisionRow = {
   id: string;
@@ -430,6 +434,8 @@ export async function resetUserPassword(
 
 // ─── Change Own Password ─────────────────────────────────────────────
 
+// ─── Change Own Password ─────────────────────────────────────────────
+
 export async function changeMyPassword(
   currentPassword: string,
   newPassword: string
@@ -437,8 +443,17 @@ export async function changeMyPassword(
   const session = await getServerSession(authOptions);
   if (!session) return { success: false, error: "Unauthorized" };
 
-  const pwErr = validatePassword(newPassword);
-  if (pwErr) return { success: false, error: pwErr };
+  // Use the same password for confirmPassword since the UI already checked they match
+  // and we want to validate complexity rules in the schema.
+  const validationResult = changePasswordSchema.safeParse({
+    currentPassword,
+    newPassword,
+    confirmPassword: newPassword
+  });
+
+  if (!validationResult.success) {
+    return { success: false, error: "Validation failed: " + validationResult.error.issues.map((i) => i.message).join(", ") };
+  }
 
   try {
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
