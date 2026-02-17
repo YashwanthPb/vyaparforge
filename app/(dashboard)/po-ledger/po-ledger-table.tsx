@@ -100,6 +100,18 @@ function progressPercent(dispatched: number, ordered: number): number {
 
 // ─── CSV Export ─────────────────────────────────────────────────────
 
+function completionColor(pct: number): string {
+  if (pct >= 100) return "text-green-700 dark:text-green-400";
+  if (pct >= 50) return "text-amber-700 dark:text-amber-400";
+  return "text-red-700 dark:text-red-400";
+}
+
+function progressBarColor(pct: number): string {
+  if (pct >= 100) return "bg-green-500";
+  if (pct > 0) return "bg-amber-500";
+  return "bg-muted";
+}
+
 function exportToCSV(rows: POLedgerRow[], summary: POLedgerSummary) {
   const headers = [
     "PO Number",
@@ -111,8 +123,10 @@ function exportToCSV(rows: POLedgerRow[], summary: POLedgerSummary) {
     "Qty Received",
     "Qty Dispatched",
     "Balance",
-    "Progress %",
+    "Completion %",
     "Rate (INR)",
+    "Total Value (INR)",
+    "Total Invoiced (INR)",
     "Balance Value (INR)",
     "Status",
   ];
@@ -127,8 +141,10 @@ function exportToCSV(rows: POLedgerRow[], summary: POLedgerSummary) {
     r.qtyReceived,
     r.qtyDispatched,
     r.balance,
-    progressPercent(r.qtyDispatched, r.qtyOrdered),
+    r.completionPct,
     r.rate,
+    r.totalValue,
+    r.totalInvoiced,
     r.balanceValue,
     r.poStatus,
   ]);
@@ -145,6 +161,8 @@ function exportToCSV(rows: POLedgerRow[], summary: POLedgerSummary) {
     summary.totalBalance,
     "",
     "",
+    summary.totalValue,
+    summary.totalInvoiced,
     summary.totalBalanceValue,
     "",
   ];
@@ -243,55 +261,47 @@ export function POLedgerTable({
   return (
     <div className="space-y-4">
       {/* ─── Summary Cards ──────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-5">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
         <Card className="py-4">
           <CardContent className="px-4">
-            <p className="text-muted-foreground text-xs font-medium">
-              Total Ordered
-            </p>
-            <p className="text-2xl font-bold">
-              {formatNumber(summary.totalOrdered)}
-            </p>
+            <p className="text-muted-foreground text-[10px] font-medium">Ordered</p>
+            <p className="text-lg font-bold">{formatNumber(summary.totalOrdered)}</p>
           </CardContent>
         </Card>
         <Card className="py-4">
           <CardContent className="px-4">
-            <p className="text-muted-foreground text-xs font-medium">
-              Total Received
-            </p>
-            <p className="text-2xl font-bold">
-              {formatNumber(summary.totalReceived)}
-            </p>
+            <p className="text-muted-foreground text-[10px] font-medium">Received</p>
+            <p className="text-lg font-bold">{formatNumber(summary.totalReceived)}</p>
           </CardContent>
         </Card>
         <Card className="py-4">
           <CardContent className="px-4">
-            <p className="text-muted-foreground text-xs font-medium">
-              Total Dispatched
-            </p>
-            <p className="text-2xl font-bold">
-              {formatNumber(summary.totalDispatched)}
-            </p>
+            <p className="text-muted-foreground text-[10px] font-medium">Dispatched</p>
+            <p className="text-lg font-bold">{formatNumber(summary.totalDispatched)}</p>
           </CardContent>
         </Card>
         <Card className="py-4">
           <CardContent className="px-4">
-            <p className="text-muted-foreground text-xs font-medium">
-              Total Balance
-            </p>
-            <p className="text-2xl font-bold">
-              {formatNumber(summary.totalBalance)}
-            </p>
+            <p className="text-muted-foreground text-[10px] font-medium">Balance</p>
+            <p className="text-lg font-bold">{formatNumber(summary.totalBalance)}</p>
           </CardContent>
         </Card>
-        <Card className="col-span-2 py-4 md:col-span-1">
+        <Card className="py-4">
           <CardContent className="px-4">
-            <p className="text-muted-foreground text-xs font-medium">
-              Balance Value
-            </p>
-            <p className="text-xl font-bold">
-              {formatINR(summary.totalBalanceValue)}
-            </p>
+            <p className="text-muted-foreground text-[10px] font-medium">Total Value</p>
+            <p className="text-lg font-bold">{formatINR(summary.totalValue)}</p>
+          </CardContent>
+        </Card>
+        <Card className="py-4">
+          <CardContent className="px-4">
+            <p className="text-muted-foreground text-[10px] font-medium">Total Invoiced</p>
+            <p className="text-lg font-bold text-green-700 dark:text-green-400">{formatINR(summary.totalInvoiced)}</p>
+          </CardContent>
+        </Card>
+        <Card className="py-4">
+          <CardContent className="px-4">
+            <p className="text-muted-foreground text-[10px] font-medium">Balance Value</p>
+            <p className="text-lg font-bold text-orange-700 dark:text-orange-400">{formatINR(summary.totalBalanceValue)}</p>
           </CardContent>
         </Card>
       </div>
@@ -396,8 +406,10 @@ export function POLedgerTable({
               <TableHead className="text-right">Received</TableHead>
               <TableHead className="text-right">Dispatched</TableHead>
               <TableHead className="text-right">Balance</TableHead>
-              <TableHead className="text-center">Progress</TableHead>
+              <TableHead className="text-center">Completion %</TableHead>
               <TableHead className="text-right">Rate</TableHead>
+              <TableHead className="text-right">Total Value</TableHead>
+              <TableHead className="text-right">Invoiced</TableHead>
               <TableHead className="text-right">Balance Value</TableHead>
             </TableRow>
           </TableHeader>
@@ -405,7 +417,7 @@ export function POLedgerTable({
             {rows.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={12}
+                  colSpan={14}
                   className="text-muted-foreground h-24 text-center"
                 >
                   No line items found for the selected filters.
@@ -413,8 +425,7 @@ export function POLedgerTable({
               </TableRow>
             ) : (
               rows.map((row) => {
-                const pct = progressPercent(row.qtyDispatched, row.qtyOrdered);
-                const config = statusConfig[row.poStatus];
+                const pct = row.completionPct;
                 return (
                   <TableRow key={row.id} className={getRowColorClass(row)}>
                     <TableCell className="font-medium">
@@ -442,23 +453,23 @@ export function POLedgerTable({
                       <div className="flex items-center justify-center gap-2">
                         <div className="bg-muted h-2 w-16 overflow-hidden rounded-full">
                           <div
-                            className={`h-full rounded-full transition-all ${
-                              pct === 100
-                                ? "bg-green-500"
-                                : pct > 0
-                                  ? "bg-amber-500"
-                                  : "bg-muted"
-                            }`}
-                            style={{ width: `${pct}%` }}
+                            className={`h-full rounded-full transition-all ${progressBarColor(pct)}`}
+                            style={{ width: `${Math.min(pct, 100)}%` }}
                           />
                         </div>
-                        <span className="text-muted-foreground w-8 text-xs">
+                        <span className={`w-9 text-xs font-semibold ${completionColor(pct)}`}>
                           {pct}%
                         </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
                       {formatINR(row.rate)}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {formatINR(row.totalValue)}
+                    </TableCell>
+                    <TableCell className="text-right text-green-700 dark:text-green-400">
+                      {row.totalInvoiced > 0 ? formatINR(row.totalInvoiced) : "—"}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {row.isOverdue && (
@@ -496,6 +507,12 @@ export function POLedgerTable({
                 </TableCell>
                 <TableCell />
                 <TableCell />
+                <TableCell className="text-right">
+                  {formatINR(summary.totalValue)}
+                </TableCell>
+                <TableCell className="text-right text-green-700 dark:text-green-400">
+                  {formatINR(summary.totalInvoiced)}
+                </TableCell>
                 <TableCell className="text-right">
                   {formatINR(summary.totalBalanceValue)}
                 </TableCell>

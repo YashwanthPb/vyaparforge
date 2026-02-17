@@ -6,6 +6,31 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { Prisma } from "@prisma/client";
 
+// ─── Types ──────────────────────────────────────────────────────────
+
+export interface PurchaseFilters {
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+  status?: string;
+  partyId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface PurchaseRow {
+  id: string;
+  invoiceNumber: string;
+  date: Date;
+  supplierName: string;
+  partyId: string;
+  totalAmount: number;
+  paidAmount: number;
+  balanceDue: number;
+  paymentStatus: "UNPAID" | "PARTIALLY_PAID" | "PAID";
+  poNumber: string;
+}
+
 // ─── Get Suppliers (for dropdown) ───────────────────────────────────
 
 export async function getSuppliers() {
@@ -19,17 +44,96 @@ export async function getSuppliers() {
   });
 }
 
-// ─── Get all Purchase Invoices ───────────────────────────────────────
+// ─── Get Suppliers for filter (only those with purchase invoices) ────
 
-export async function getPurchaseInvoices() {
+export async function getSuppliersForFilter() {
   const session = await getServerSession(authOptions);
   if (!session) return [];
 
-  const invoices = await prisma.purchaseInvoice.findMany({
-    include: {
-      party: { select: { name: true } },
+  return await prisma.party.findMany({
+    where: {
+      purchaseInvoices: { some: {} },
     },
-    orderBy: { date: "desc" },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+}
+
+// ─── Get all Purchase Invoices (with filters) ────────────────────────
+
+export async function getPurchaseInvoices(filters: PurchaseFilters = {}) {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  const where: Prisma.PurchaseInvoiceWhereInput = {};
+
+  // Status filter
+  if (filters.status && filters.status !== "ALL") {
+    where.paymentStatus = filters.status as Prisma.EnumPurchaseInvoiceStatusFilter["equals"];
+  }
+
+  // Party filter
+  if (filters.partyId) {
+    where.partyId = filters.partyId;
+  }
+
+  // Date range
+  if (filters.dateFrom || filters.dateTo) {
+    where.date = {};
+    if (filters.dateFrom) where.date.gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      where.date.lte = to;
+    }
+  }
+
+  // Search
+  if (filters.search) {
+    const term = filters.search.trim();
+    if (term) {
+      where.OR = [
+        { invoiceNumber: { contains: term, mode: "insensitive" } },
+        { party: { name: { contains: term, mode: "insensitive" } } },
+        { poNumber: { contains: term, mode: "insensitive" } },
+      ];
+    }
+  }
+
+  // Sorting
+  let orderBy: Prisma.PurchaseInvoiceOrderByWithRelationInput = { date: "desc" };
+  if (filters.sort) {
+    const direction = filters.order === "asc" ? "asc" : "desc";
+    switch (filters.sort) {
+      case "invoiceNumber":
+        orderBy = { invoiceNumber: direction };
+        break;
+      case "date":
+        orderBy = { date: direction };
+        break;
+      case "party":
+        orderBy = { party: { name: direction } };
+        break;
+      case "totalAmount":
+        orderBy = { totalAmount: direction };
+        break;
+      case "balanceDue":
+        orderBy = { balanceDue: direction };
+        break;
+      case "status":
+        orderBy = { paymentStatus: direction };
+        break;
+      default:
+        orderBy = { date: "desc" };
+    }
+  }
+
+  const invoices = await prisma.purchaseInvoice.findMany({
+    where,
+    include: {
+      party: { select: { id: true, name: true } },
+    },
+    orderBy,
   });
 
   return invoices.map((inv) => ({
@@ -42,10 +146,7 @@ export async function getPurchaseInvoices() {
     paidAmount: Number(inv.paidAmount),
     balanceDue: Number(inv.balanceDue),
     paymentStatus: inv.paymentStatus,
-    paymentType: inv.paymentType ?? "",
     poNumber: inv.poNumber ?? "",
-    workOrder: inv.workOrder ?? "",
-    description: inv.description ?? "",
   }));
 }
 
@@ -162,5 +263,62 @@ export async function markPurchaseInvoicePaid(id: string, paidAmount: number) {
     return { success: true as const };
   } catch {
     return { success: false as const, error: "Failed to update payment" };
+  }
+}
+
+// ─── Bulk Mark as Paid ──────────────────────────────────────────────
+
+export async function bulkMarkPurchasesPaid(ids: string[]) {
+  const session = await getServerSession(authOptions);
+  if (!session) return { success: false as const, error: "Unauthorized" };
+
+  if (!ids.length || ids.length > 100) {
+    return { success: false as const, error: "Invalid selection" };
+  }
+
+  try {
+    const invoices = await prisma.purchaseInvoice.findMany({
+      where: {
+        id: { in: ids },
+        paymentStatus: { not: "PAID" },
+      },
+    });
+
+    if (invoices.length === 0) {
+      return { success: false as const, error: "No eligible invoices found" };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const inv of invoices) {
+        const totalAmount = Number(inv.totalAmount);
+        await tx.purchaseInvoice.update({
+          where: { id: inv.id },
+          data: {
+            paidAmount: new Prisma.Decimal(totalAmount.toFixed(2)),
+            balanceDue: new Prisma.Decimal("0"),
+            paymentStatus: "PAID",
+          },
+        });
+      }
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        entity: "PurchaseInvoice",
+        entityId: ids.join(","),
+        action: "UPDATE",
+        changes: {
+          action: `Bulk marked ${invoices.length} purchase invoices as paid`,
+          ids,
+        },
+        userId: session.user.id,
+      },
+    });
+
+    revalidatePath("/purchases");
+    return { success: true as const, count: invoices.length };
+  } catch (error) {
+    console.error("bulkMarkPurchasesPaid error:", error);
+    return { success: false as const, error: "Failed to mark as paid" };
   }
 }

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
+import { useEffect, useState } from "react";
 import {
   LayoutDashboard,
   FileText,
@@ -30,66 +31,93 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { getSidebarBadgeCounts } from "@/lib/sidebar-actions";
+
+type BadgeCounts = {
+  unpaidInvoices: number;
+  unpaidPurchases: number;
+  activePOs: number;
+};
 
 const mainNavItems = [
   {
     title: "Dashboard",
     href: "/",
     icon: LayoutDashboard,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Purchase Orders",
     href: "/purchase-orders",
     icon: FileText,
+    badgeKey: "activePOs" as keyof BadgeCounts | null,
   },
   {
     title: "Inward Gate Passes",
     href: "/inward-gate-passes",
     icon: ArrowDownToLine,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Delivery Challans",
     href: "/outward-gate-passes",
     icon: FileOutput,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Invoices",
     href: "/invoices",
     icon: Receipt,
+    badgeKey: "unpaidInvoices" as keyof BadgeCounts | null,
   },
   {
     title: "Purchases",
     href: "/purchases",
     icon: ShoppingCart,
+    badgeKey: "unpaidPurchases" as keyof BadgeCounts | null,
   },
   {
     title: "PO Ledger",
     href: "/po-ledger",
     icon: BookOpen,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Parties",
     href: "/parties",
     icon: Users,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Credit Notes",
     href: "/credit-notes",
     icon: CreditCard,
+    badgeKey: null as keyof BadgeCounts | null,
   },
   {
     title: "Reports",
     href: "/reports",
     icon: BarChart3,
+    badgeKey: null as keyof BadgeCounts | null,
   },
 ];
 
 export function AppSidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
+  const [badges, setBadges] = useState<BadgeCounts>({
+    unpaidInvoices: 0,
+    unpaidPurchases: 0,
+    activePOs: 0,
+  });
 
   const userName = session?.user?.name ?? "User";
   const userRole = session?.user?.role ?? "USER";
+
+  useEffect(() => {
+    if (!session) return;
+    getSidebarBadgeCounts().then(setBadges).catch(() => { });
+  }, [session, pathname]);
 
   return (
     <Sidebar collapsible="icon">
@@ -118,24 +146,32 @@ export function AppSidebar() {
           <SidebarGroupLabel>Operations</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {mainNavItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={
-                      item.href === "/"
-                        ? pathname === "/"
-                        : pathname.startsWith(item.href)
-                    }
-                    tooltip={item.title}
-                  >
-                    <Link href={item.href}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
+              {mainNavItems.map((item) => {
+                const badgeCount = item.badgeKey ? badges[item.badgeKey] : 0;
+                return (
+                  <SidebarMenuItem key={item.href}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={
+                        item.href === "/"
+                          ? pathname === "/"
+                          : pathname.startsWith(item.href)
+                      }
+                      tooltip={item.title}
+                    >
+                      <Link href={item.href}>
+                        <item.icon />
+                        <span className="flex-1">{item.title}</span>
+                        {badgeCount > 0 && (
+                          <span className="ml-auto inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-primary/10 px-1.5 text-[10px] font-semibold text-primary">
+                            {badgeCount}
+                          </span>
+                        )}
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                );
+              })}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>

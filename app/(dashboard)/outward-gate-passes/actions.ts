@@ -11,24 +11,117 @@ import {
   getByIdSchema,
 } from "@/lib/validations";
 
-// ─── Get all Outward Gate Passes ────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────
 
-export async function getOutwardGatePasses() {
+export interface DCFilters {
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+  partyId?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface DCRow {
+  id: string;
+  gpNumber: string;
+  date: Date;
+  purchaseOrderId: string;
+  poNumber: string;
+  divisionName: string;
+  partNumber: string;
+  partName: string;
+  batchNumber: string | null;
+  qty: number;
+  vehicleNumber: string | null;
+  challanNumber: string | null;
+  dispatchDate: Date | null;
+  partyName: string;
+  partyId: string;
+  linkedInvoiceNumber: string | null;
+  linkedInvoiceId: string | null;
+}
+
+// ─── Get all Outward Gate Passes (with filters) ─────────────────────
+
+export async function getOutwardGatePasses(filters: DCFilters = {}) {
   const session = await getServerSession(authOptions);
   if (!session) return [];
 
+  const where: Prisma.OutwardGatePassWhereInput = {};
+
+  // Date range
+  if (filters.dateFrom || filters.dateTo) {
+    where.date = {};
+    if (filters.dateFrom) where.date.gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      where.date.lte = to;
+    }
+  }
+
+  // Party filter (via PO -> party)
+  if (filters.partyId) {
+    where.purchaseOrder = { partyId: filters.partyId };
+  }
+
+  // Search
+  if (filters.search) {
+    const term = filters.search.trim();
+    if (term) {
+      where.OR = [
+        { gpNumber: { contains: term, mode: "insensitive" } },
+        { challanNumber: { contains: term, mode: "insensitive" } },
+        { purchaseOrder: { poNumber: { contains: term, mode: "insensitive" } } },
+        { purchaseOrder: { party: { name: { contains: term, mode: "insensitive" } } } },
+        { poLineItem: { partNumber: { contains: term, mode: "insensitive" } } },
+      ];
+    }
+  }
+
+  // Sorting
+  let orderBy: Prisma.OutwardGatePassOrderByWithRelationInput = { date: "desc" };
+  if (filters.sort) {
+    const direction = filters.order === "asc" ? "asc" : "desc";
+    switch (filters.sort) {
+      case "gpNumber":
+        orderBy = { gpNumber: direction };
+        break;
+      case "date":
+        orderBy = { date: direction };
+        break;
+      case "poNumber":
+        orderBy = { purchaseOrder: { poNumber: direction } };
+        break;
+      case "party":
+        orderBy = { purchaseOrder: { party: { name: direction } } };
+        break;
+      case "qty":
+        orderBy = { qty: direction };
+        break;
+      default:
+        orderBy = { date: "desc" };
+    }
+  }
+
   const gatePasses = await prisma.outwardGatePass.findMany({
+    where,
     include: {
       purchaseOrder: {
         include: {
           division: { select: { name: true } },
+          party: { select: { id: true, name: true } },
         },
       },
       poLineItem: {
         select: { partNumber: true, partName: true },
       },
+      invoice: {
+        select: { id: true, invoiceNumber: true },
+      },
     },
-    orderBy: { date: "desc" },
+    orderBy,
   });
 
   return gatePasses.map((gp) => ({
@@ -45,7 +138,33 @@ export async function getOutwardGatePasses() {
     vehicleNumber: gp.vehicleNumber,
     challanNumber: gp.challanNumber,
     dispatchDate: gp.dispatchDate,
+    partyName: gp.purchaseOrder.party?.name ?? "",
+    partyId: gp.purchaseOrder.party?.id ?? "",
+    linkedInvoiceNumber: gp.invoice?.invoiceNumber ?? null,
+    linkedInvoiceId: gp.invoice?.id ?? null,
   }));
+}
+
+// ─── Get Parties for DC filter ──────────────────────────────────────
+
+export async function getDCPartiesForFilter() {
+  const session = await getServerSession(authOptions);
+  if (!session) return [];
+
+  // Parties that have POs with outward gate passes
+  const parties = await prisma.party.findMany({
+    where: {
+      purchaseOrders: {
+        some: {
+          outwardGatePasses: { some: {} },
+        },
+      },
+    },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
+
+  return parties;
 }
 
 // ─── Get single Outward Gate Pass ───────────────────────────────────
@@ -63,6 +182,7 @@ export async function getOutwardGatePass(id: string) {
       purchaseOrder: {
         include: {
           division: true,
+          party: { select: { name: true } },
         },
       },
       poLineItem: {
@@ -72,6 +192,9 @@ export async function getOutwardGatePass(id: string) {
           workOrder: true,
           unit: true,
         },
+      },
+      invoice: {
+        select: { id: true, invoiceNumber: true },
       },
     },
   });
@@ -85,6 +208,7 @@ export async function getOutwardGatePass(id: string) {
     purchaseOrderId: gatePass.purchaseOrderId,
     poNumber: gatePass.purchaseOrder.poNumber,
     divisionName: gatePass.purchaseOrder.division.name,
+    partyName: gatePass.purchaseOrder.party?.name ?? "",
     partNumber: gatePass.poLineItem.partNumber,
     partName: gatePass.poLineItem.partName,
     workOrder: gatePass.poLineItem.workOrder,
@@ -95,6 +219,8 @@ export async function getOutwardGatePass(id: string) {
     challanNumber: gatePass.challanNumber,
     dispatchDate: gatePass.dispatchDate,
     remarks: gatePass.remarks,
+    linkedInvoiceNumber: gatePass.invoice?.invoiceNumber ?? null,
+    linkedInvoiceId: gatePass.invoice?.id ?? null,
   };
 }
 

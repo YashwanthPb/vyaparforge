@@ -16,6 +16,7 @@ export type POLedgerFilters = {
 
 export type POLedgerRow = {
   id: string;
+  poId: string;
   poNumber: string;
   poDate: string;
   deliveryDate: string | null;
@@ -28,7 +29,10 @@ export type POLedgerRow = {
   qtyDispatched: number;
   balance: number;
   rate: number;
+  totalValue: number;
+  totalInvoiced: number;
   balanceValue: number;
+  completionPct: number;
   poStatus: "OPEN" | "PARTIALLY_FULFILLED" | "COMPLETED" | "CANCELLED";
   isOverdue: boolean;
 };
@@ -38,6 +42,8 @@ export type POLedgerSummary = {
   totalReceived: number;
   totalDispatched: number;
   totalBalance: number;
+  totalValue: number;
+  totalInvoiced: number;
   totalBalanceValue: number;
   rowCount: number;
 };
@@ -71,7 +77,20 @@ export async function getPOLedgerData(
   filters: POLedgerFilters = {}
 ): Promise<POLedgerData> {
   const session = await getServerSession(authOptions);
-  if (!session) return { rows: [], summary: { totalOrdered: 0, totalReceived: 0, totalDispatched: 0, totalBalance: 0, totalBalanceValue: 0, rowCount: 0 } };
+  if (!session)
+    return {
+      rows: [],
+      summary: {
+        totalOrdered: 0,
+        totalReceived: 0,
+        totalDispatched: 0,
+        totalBalance: 0,
+        totalValue: 0,
+        totalInvoiced: 0,
+        totalBalanceValue: 0,
+        rowCount: 0,
+      },
+    };
 
   const parsed = poLedgerFiltersSchema.safeParse(filters);
   const validFilters: POLedgerFilters = parsed.success ? parsed.data : {};
@@ -103,6 +122,13 @@ export async function getPOLedgerData(
       division: true,
       lineItems: {
         orderBy: { createdAt: "asc" },
+        include: {
+          invoiceItems: {
+            select: {
+              amount: true,
+            },
+          },
+        },
       },
     },
     orderBy: { date: "desc" },
@@ -118,6 +144,15 @@ export async function getPOLedgerData(
       const qtyDispatched = Number(item.qtyDispatched);
       const rate = Number(item.rate);
       const balance = qtyOrdered - qtyDispatched;
+      const totalValue = qtyOrdered * rate;
+      const totalInvoiced = item.invoiceItems.reduce(
+        (sum, ii) => sum + Number(ii.amount),
+        0
+      );
+      const completionPct =
+        qtyOrdered > 0
+          ? Math.round((qtyDispatched / qtyOrdered) * 100)
+          : 0;
       const isOverdue =
         po.deliveryDate !== null &&
         new Date(po.deliveryDate) < now &&
@@ -125,6 +160,7 @@ export async function getPOLedgerData(
 
       rows.push({
         id: item.id,
+        poId: po.id,
         poNumber: po.poNumber,
         poDate: po.date.toISOString(),
         deliveryDate: po.deliveryDate?.toISOString() ?? null,
@@ -137,7 +173,10 @@ export async function getPOLedgerData(
         qtyDispatched,
         balance,
         rate,
+        totalValue,
+        totalInvoiced,
         balanceValue: balance * rate,
+        completionPct,
         poStatus: po.status,
         isOverdue,
       });
@@ -149,6 +188,8 @@ export async function getPOLedgerData(
     totalReceived: rows.reduce((sum, r) => sum + r.qtyReceived, 0),
     totalDispatched: rows.reduce((sum, r) => sum + r.qtyDispatched, 0),
     totalBalance: rows.reduce((sum, r) => sum + r.balance, 0),
+    totalValue: rows.reduce((sum, r) => sum + r.totalValue, 0),
+    totalInvoiced: rows.reduce((sum, r) => sum + r.totalInvoiced, 0),
     totalBalanceValue: rows.reduce((sum, r) => sum + r.balanceValue, 0),
     rowCount: rows.length,
   };

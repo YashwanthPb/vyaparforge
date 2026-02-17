@@ -10,13 +10,86 @@ import {
   searchQuerySchema,
 } from "@/lib/validations";
 
-// ─── Get all Inward Gate Passes ─────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────────────────
 
-export async function getInwardGatePasses() {
+export interface GPFilters {
+  sort?: string;
+  order?: "asc" | "desc";
+  search?: string;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
+export interface GPRow {
+  id: string;
+  gpNumber: string;
+  date: Date;
+  purchaseOrderId: string;
+  poNumber: string;
+  divisionName: string;
+  partNumber: string;
+  partName: string;
+  batchNumber: string | null;
+  qty: number;
+  vehicleNumber: string | null;
+}
+
+// ─── Get all Inward Gate Passes (with filters) ──────────────────────
+
+export async function getInwardGatePasses(filters: GPFilters = {}) {
   const session = await getServerSession(authOptions);
   if (!session) return [];
 
+  const where: Prisma.InwardGatePassWhereInput = {};
+
+  // Date range
+  if (filters.dateFrom || filters.dateTo) {
+    where.date = {};
+    if (filters.dateFrom) where.date.gte = new Date(filters.dateFrom);
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo);
+      to.setHours(23, 59, 59, 999);
+      where.date.lte = to;
+    }
+  }
+
+  // Search
+  if (filters.search) {
+    const term = filters.search.trim();
+    if (term) {
+      where.OR = [
+        { gpNumber: { contains: term, mode: "insensitive" } },
+        { purchaseOrder: { poNumber: { contains: term, mode: "insensitive" } } },
+        { poLineItem: { partNumber: { contains: term, mode: "insensitive" } } },
+        { purchaseOrder: { division: { name: { contains: term, mode: "insensitive" } } } },
+      ];
+    }
+  }
+
+  // Sorting
+  let orderBy: Prisma.InwardGatePassOrderByWithRelationInput = { date: "desc" };
+  if (filters.sort) {
+    const direction = filters.order === "asc" ? "asc" : "desc";
+    switch (filters.sort) {
+      case "gpNumber":
+        orderBy = { gpNumber: direction };
+        break;
+      case "date":
+        orderBy = { date: direction };
+        break;
+      case "poNumber":
+        orderBy = { purchaseOrder: { poNumber: direction } };
+        break;
+      case "qty":
+        orderBy = { qty: direction };
+        break;
+      default:
+        orderBy = { date: "desc" };
+    }
+  }
+
   const gatePasses = await prisma.inwardGatePass.findMany({
+    where,
     include: {
       purchaseOrder: {
         include: {
@@ -27,7 +100,7 @@ export async function getInwardGatePasses() {
         select: { partNumber: true, partName: true },
       },
     },
-    orderBy: { date: "desc" },
+    orderBy,
   });
 
   return gatePasses.map((gp) => ({
@@ -42,11 +115,10 @@ export async function getInwardGatePasses() {
     batchNumber: gp.batchNumber,
     qty: Number(gp.qty),
     vehicleNumber: gp.vehicleNumber,
-    challanNumber: gp.challanNumber,
   }));
 }
 
-// ─── Search Purchase Orders ─────────────────────────────────────────
+// ─── Search purchase orders ─────────────────────────────────────────
 
 export async function searchPurchaseOrder(query: string) {
   const session = await getServerSession(authOptions);
@@ -111,14 +183,18 @@ export async function createInwardGatePass(data: {
   batchNumber?: string;
   qty: number;
   vehicleNumber?: string;
-  challanNumber?: string;
 }) {
   const session = await getServerSession(authOptions);
   if (!session) return { success: false as const, error: "Unauthorized" };
 
   const parsed = createInwardGatePassSchema.safeParse(data);
   if (!parsed.success) {
-    return { success: false as const, error: "Validation failed: " + parsed.error.issues.map((i) => i.message).join(", ") };
+    return {
+      success: false as const,
+      error:
+        "Validation failed: " +
+        parsed.error.issues.map((i) => i.message).join(", "),
+    };
   }
 
   const validated = parsed.data;
@@ -149,7 +225,6 @@ export async function createInwardGatePass(data: {
           batchNumber: validated.batchNumber || null,
           qty: new Prisma.Decimal(validated.qty),
           vehicleNumber: validated.vehicleNumber || null,
-          challanNumber: validated.challanNumber || null,
         },
       });
 
@@ -167,11 +242,11 @@ export async function createInwardGatePass(data: {
       });
 
       const allFullyReceived = allLineItems.every(
-        (item) => Number(item.qtyReceived) >= Number(item.qtyOrdered)
+        (item) => Number(item.qtyReceived) + (item.id === validated.poLineItemId ? validated.qty : 0) >= Number(item.qtyOrdered)
       );
 
       const someReceived = allLineItems.some(
-        (item) => Number(item.qtyReceived) > 0
+        (item) => Number(item.qtyReceived) > 0 || item.id === validated.poLineItemId
       );
 
       let newStatus: "OPEN" | "PARTIALLY_FULFILLED" | "COMPLETED" = "OPEN";
@@ -194,7 +269,10 @@ export async function createInwardGatePass(data: {
         entity: "InwardGatePass",
         entityId: result.id,
         action: "CREATE",
-        changes: { gpNumber: result.gpNumber, purchaseOrderId: validated.purchaseOrderId },
+        changes: {
+          gpNumber: result.gpNumber,
+          purchaseOrderId: validated.purchaseOrderId,
+        },
         userId: session.user.id,
       },
     });
@@ -209,11 +287,11 @@ export async function createInwardGatePass(data: {
       error instanceof Prisma.PrismaClientKnownRequestError &&
       error.code === "P2002"
     ) {
-      return { success: false as const, error: "Gate Pass number already exists" };
+      return { success: false as const, error: "Gate pass number already exists" };
     }
     if (error instanceof Error) {
       return { success: false as const, error: error.message };
     }
-    return { success: false as const, error: "Failed to create gate pass" };
+    return { success: false as const, error: "Failed to create inward gate pass" };
   }
 }

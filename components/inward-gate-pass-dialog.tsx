@@ -156,7 +156,6 @@ export function InwardGatePassDialog({
       batchNumber: batchNumber.trim() || undefined,
       qty: Number(qty),
       vehicleNumber: vehicleNumber.trim() || undefined,
-      challanNumber: challanNumber.trim() || undefined,
     });
 
     if (result.success) {
@@ -272,11 +271,10 @@ export function InwardGatePassDialog({
                     key={item.id}
                     type="button"
                     disabled={disabled}
-                    className={`w-full rounded-lg border p-3 text-left transition-colors ${
-                      disabled
+                    className={`w-full rounded-lg border p-3 text-left transition-colors ${disabled
                         ? "cursor-not-allowed opacity-50"
                         : "hover:bg-accent"
-                    }`}
+                      }`}
                     onClick={() => selectLineItem(item)}
                   >
                     <div className="flex items-center justify-between">
