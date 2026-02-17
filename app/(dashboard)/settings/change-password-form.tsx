@@ -13,21 +13,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PasswordStrengthMeter } from "@/components/ui/password-strength-meter";
 import { changeMyPassword } from "./actions";
-
-function getStrength(password: string): { label: string; color: string; width: string } {
-  if (password.length === 0) return { label: "", color: "", width: "0%" };
-  let score = 0;
-  if (password.length >= 8) score++;
-  if (/[A-Z]/.test(password)) score++;
-  if (/[a-z]/.test(password)) score++;
-  if (/[0-9]/.test(password)) score++;
-  if (/[^A-Za-z0-9]/.test(password)) score++;
-
-  if (score <= 2) return { label: "Weak", color: "bg-destructive", width: "33%" };
-  if (score <= 3) return { label: "Medium", color: "bg-yellow-500", width: "66%" };
-  return { label: "Strong", color: "bg-green-500", width: "100%" };
-}
 
 function PasswordField({
   id,
@@ -75,8 +62,6 @@ export function ChangePasswordForm() {
   const [newPw, setNewPw] = useState("");
   const [confirm, setConfirm] = useState("");
 
-  const strength = getStrength(newPw);
-
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!current) { toast.error("Current password is required."); return; }
@@ -116,37 +101,16 @@ export function ChangePasswordForm() {
             onChange={setCurrent}
             placeholder="Enter current password"
           />
-          <PasswordField
-            id="new-password"
-            label="New Password"
-            value={newPw}
-            onChange={setNewPw}
-            placeholder="Min 8 chars, upper, lower, number"
-          />
-          {newPw.length > 0 && (
-            <div className="space-y-1">
-              <div className="bg-muted h-1.5 w-full rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${strength.color}`}
-                  style={{ width: strength.width }}
-                />
-              </div>
-              <p className="text-muted-foreground text-xs">
-                Password strength:{" "}
-                <span
-                  className={
-                    strength.label === "Strong"
-                      ? "text-green-600 font-medium"
-                      : strength.label === "Medium"
-                        ? "text-yellow-600 font-medium"
-                        : "text-destructive font-medium"
-                  }
-                >
-                  {strength.label}
-                </span>
-              </p>
-            </div>
-          )}
+          <div className="space-y-1">
+            <PasswordField
+              id="new-password"
+              label="New Password"
+              value={newPw}
+              onChange={setNewPw}
+              placeholder="Min 8 chars, upper, lower, number"
+            />
+            {newPw.length > 0 && <PasswordStrengthMeter password={newPw} />}
+          </div>
           <PasswordField
             id="confirm-password"
             label="Confirm New Password"

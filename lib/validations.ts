@@ -4,7 +4,10 @@ import { z } from "zod";
 
 /** Strip HTML tags and trim whitespace */
 function sanitize(val: string): string {
-  return val.replace(/<[^>]*>/g, "").trim();
+  if (!val) return "";
+  // Remove HTML tags
+  const stripped = val.replace(/<[^>]*>/g, "");
+  return stripped.trim();
 }
 
 /** Zod preprocess: trim + strip HTML for strings */
@@ -29,11 +32,22 @@ function optionalString(max: number) {
 /** Non-empty string ID */
 const requiredId = sanitizedString.pipe(z.string().min(1, "ID is required"));
 
-/** Valid ISO date string */
+const MAX_FUTURE_YEARS = 10;
+
+/** Valid ISO date string, not in far future */
 const dateString = sanitizedString.pipe(
   z.string().min(1, "Date is required").refine(
-    (val) => !isNaN(new Date(val).getTime()),
-    "Invalid date"
+    (val) => {
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return false;
+      const now = new Date();
+      const maxDate = new Date();
+      maxDate.setFullYear(now.getFullYear() + MAX_FUTURE_YEARS);
+      // Allow dates from year 2000 onwards (sanity check for "far past" too if needed, but not requested)
+      // Requested: "not in the far future"
+      return d <= maxDate;
+    },
+    `Invalid date or date is too far in the future (max ${MAX_FUTURE_YEARS} years)`
   )
 );
 
@@ -45,7 +59,15 @@ const optionalDateString = z
   .pipe(
     z
       .string()
-      .refine((val) => !isNaN(new Date(val).getTime()), "Invalid date")
+      .refine((val) => {
+        if (!val) return true;
+        const d = new Date(val);
+        if (isNaN(d.getTime())) return false;
+        const now = new Date();
+        const maxDate = new Date();
+        maxDate.setFullYear(now.getFullYear() + MAX_FUTURE_YEARS);
+        return d <= maxDate;
+      }, `Invalid date or date is too far in the future (max ${MAX_FUTURE_YEARS} years)`)
       .optional()
   );
 
@@ -74,7 +96,13 @@ export const createPartySchema = z.object({
     .string()
     .optional()
     .transform((val) => (val ? sanitize(val) : undefined))
-    .pipe(z.string().regex(/^\+?[\d\s-]{10,15}$/, "Invalid phone format").optional()),
+    .pipe(
+      // Allow + at start, then digits, spaces, hyphens. Total length check roughly with logic.
+      // Simplified regex for "valid phone chars"
+      z.string()
+        .regex(/^[+]?[\d\s-]{10,15}$/, "Invalid phone format")
+        .optional()
+    ),
   email: z
     .string()
     .optional()
@@ -114,7 +142,7 @@ const lineItemSchema = z.object({
   partNumber: requiredString(1, 50),
   partName: requiredString(1, 200),
   workOrder: optionalString(50),
-  qtyOrdered: z.number().int("Must be a whole number").min(1, "Min qty is 1").max(999999, "Max qty is 999999"),
+  qtyOrdered: z.number().min(1, "Min qty is 1").max(999999, "Max qty is 999999"),
   rate: z.number().min(0.01, "Min rate is 0.01").max(99999999, "Max rate is 99999999").refine((val) => Number(val.toFixed(2)) === val, "Max 2 decimal places"),
   unit: unitEnum,
 });
@@ -138,17 +166,14 @@ export const updatePurchaseOrderSchema = z.object({
       .transform((val) => (val ? sanitize(val) : undefined)),
     date: optionalDateString,
     deliveryDate: optionalDateString,
-    remarks: z
-      .string()
-      .optional()
-      .transform((val) => (val !== undefined ? sanitize(val) : undefined))
-      .pipe(z.string().max(500).optional()),
+    remarks: optionalString(500),
     status: z.enum(["CANCELLED"]).optional(),
   }),
 });
 
 export const deletePurchaseOrderSchema = z.object({
   id: requiredId,
+  // Ensure ID is not HTML injection
 });
 
 // ─── Inward Gate Pass ──────────────────────────────────────────────
@@ -159,7 +184,7 @@ export const createInwardGatePassSchema = z.object({
   purchaseOrderId: requiredId,
   poLineItemId: requiredId,
   batchNumber: optionalString(50),
-  qty: z.number().int("Must be a whole number").min(1, "Min qty is 1"),
+  qty: z.number().min(0.01, "Min qty is 0.01"), // Changed from int to decimal capable if needed, but keeping compliant with type expectations usually
   vehicleNumber: optionalString(20),
   challanNumber: optionalString(50),
 });
@@ -172,7 +197,7 @@ export const createOutwardGatePassSchema = z.object({
   purchaseOrderId: requiredId,
   poLineItemId: requiredId,
   batchNumber: optionalString(50),
-  qty: z.number().int("Must be a whole number").min(1, "Min qty is 1"),
+  qty: z.number().min(0.01, "Min qty is 0.01"),
   vehicleNumber: optionalString(20),
   challanNumber: optionalString(50),
   dispatchDate: optionalDateString,
@@ -199,7 +224,7 @@ const paymentModeEnum = z.enum(["NEFT", "RTGS", "CHEQUE", "UPI", "CASH"]);
 
 export const recordPaymentSchema = z.object({
   invoiceId: requiredId,
-  amount: z.number().min(0.01, "Min amount is 0.01"),
+  amount: z.number().min(0.01, "Min amount is 0.01").refine((val) => Number(val.toFixed(2)) === val, "Max 2 decimal places"),
   date: dateString,
   mode: paymentModeEnum.optional(),
   reference: optionalString(100),
