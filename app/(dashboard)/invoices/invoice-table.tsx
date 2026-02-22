@@ -413,8 +413,8 @@ export function InvoiceTable({
                     >
                       <Check
                         className={`mr-2 size-4 ${currentPartyId === party.id
-                            ? "opacity-100"
-                            : "opacity-0"
+                          ? "opacity-100"
+                          : "opacity-0"
                           }`}
                       />
                       {party.name}
@@ -527,6 +527,8 @@ export function InvoiceTable({
                 sortState={sortState}
                 onSort={handleSort}
               />
+              <TableHead>DC Number</TableHead>
+              <TableHead>Gate Pass</TableHead>
               <SortableHeader
                 label="Total Amount"
                 field="totalAmount"
@@ -547,7 +549,7 @@ export function InvoiceTable({
             {invoices.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={7}
+                  colSpan={9}
                   className="text-muted-foreground h-24 text-center"
                 >
                   {currentSearch || currentStatus !== "ALL" || currentPartyId || currentDateFrom
@@ -593,6 +595,12 @@ export function InvoiceTable({
                       ) : (
                         "—"
                       )}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {inv.dcNumber || "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {inv.gatePassNumber || "—"}
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       {formatCurrency(inv.totalAmount)}

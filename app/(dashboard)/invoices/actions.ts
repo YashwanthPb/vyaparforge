@@ -132,7 +132,7 @@ export async function getInvoices(filters: InvoiceFilters = {}) {
     invoiceNumber: inv.invoiceNumber,
     date: inv.date,
     poNumber: inv.purchaseOrder?.poNumber ?? "",
-    divisionName: inv.purchaseOrder?.division.name ?? "",
+    divisionName: inv.purchaseOrder?.division?.name ?? inv.party?.name ?? "",
     partyId: inv.party?.id ?? "",
     partyName: inv.party?.name ?? "",
     subtotal: Number(inv.subtotal),
@@ -176,7 +176,7 @@ export async function getInvoice(id: string) {
     where: { id: parsed.data.id },
     include: {
       party: {
-        select: { name: true },
+        select: { name: true, gstin: true, address: true, phone: true },
       },
       purchaseOrder: {
         include: {

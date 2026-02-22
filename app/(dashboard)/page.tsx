@@ -19,9 +19,9 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FileText,
-  PackageOpen,
-  Truck,
-  AlertTriangle,
+  CheckCircle2,
+  XCircle,
+  ShoppingCart,
   Building2,
   TrendingUp,
   TrendingDown,
@@ -95,32 +95,32 @@ export default async function DashboardPage() {
 
   const statCards = [
     {
-      title: "Open POs",
-      value: stats.openPOs,
+      title: "Total Invoices",
+      value: stats.totalInvoices.toLocaleString("en-IN"),
       icon: FileText,
       accent: "text-blue-600",
       bg: "bg-blue-50 dark:bg-blue-950/40",
     },
     {
-      title: "Pending Material",
-      value: stats.pendingMaterial,
-      icon: PackageOpen,
-      accent: "text-orange-600",
-      bg: "bg-orange-50 dark:bg-orange-950/40",
-    },
-    {
-      title: "Ready to Dispatch",
-      value: stats.readyToDispatch,
-      icon: Truck,
+      title: "Paid Invoices",
+      value: stats.paidInvoices.toLocaleString("en-IN"),
+      icon: CheckCircle2,
       accent: "text-green-600",
       bg: "bg-green-50 dark:bg-green-950/40",
     },
     {
-      title: "Overdue POs",
-      value: stats.overdue,
-      icon: AlertTriangle,
+      title: "Unpaid Invoices",
+      value: stats.unpaidInvoices.toLocaleString("en-IN"),
+      icon: XCircle,
       accent: "text-red-600",
       bg: "bg-red-50 dark:bg-red-950/40",
+    },
+    {
+      title: "Purchase Invoices",
+      value: stats.purchaseInvoices.toLocaleString("en-IN"),
+      icon: ShoppingCart,
+      accent: "text-orange-600",
+      bg: "bg-orange-50 dark:bg-orange-950/40",
     },
   ];
 

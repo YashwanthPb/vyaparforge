@@ -8,40 +8,27 @@ import { authOptions } from "@/lib/auth";
 
 export async function getDashboardStats() {
   const session = await getServerSession(authOptions);
-  if (!session) return { openPOs: 0, pendingMaterial: 0, readyToDispatch: 0, overdue: 0 };
-  const [openPOs, lineItems, overdue] = await Promise.all([
-    // Count of POs with status OPEN or PARTIALLY_FULFILLED
-    prisma.purchaseOrder.count({
-      where: { status: { in: ["OPEN", "PARTIALLY_FULFILLED"] } },
-    }),
+  if (!session)
+    return {
+      totalInvoices: 0,
+      paidInvoices: 0,
+      unpaidInvoices: 0,
+      purchaseInvoices: 0,
+    };
 
-    // Fetch all line items to compare qtyReceived vs qtyOrdered/qtyDispatched
-    prisma.pOLineItem.findMany({
-      select: { qtyOrdered: true, qtyReceived: true, qtyDispatched: true },
-    }),
-
-    // POs where deliveryDate < today AND status not COMPLETED
-    prisma.purchaseOrder.count({
-      where: {
-        deliveryDate: { lt: new Date() },
-        status: { not: "COMPLETED" },
-      },
-    }),
-  ]);
-
-  const pendingMaterial = lineItems.filter(
-    (i) => Number(i.qtyReceived) < Number(i.qtyOrdered)
-  ).length;
-
-  const readyToDispatch = lineItems.filter(
-    (i) => Number(i.qtyReceived) > Number(i.qtyDispatched)
-  ).length;
+  const [totalInvoices, paidInvoices, unpaidInvoices, purchaseInvoices] =
+    await Promise.all([
+      prisma.invoice.count(),
+      prisma.invoice.count({ where: { status: "PAID" } }),
+      prisma.invoice.count({ where: { status: "UNPAID" } }),
+      prisma.purchaseInvoice.count(),
+    ]);
 
   return {
-    openPOs,
-    pendingMaterial,
-    readyToDispatch,
-    overdue,
+    totalInvoices,
+    paidInvoices,
+    unpaidInvoices,
+    purchaseInvoices,
   };
 }
 
@@ -98,13 +85,10 @@ export async function getOutstandingStats() {
   const session = await getServerSession(authOptions);
   if (!session) return { receivables: 0, payables: 0 };
 
-  const [unpaidInvoices, unpaidPurchases] = await Promise.all([
-    prisma.invoice.findMany({
+  const [receivablesAgg, payablesAgg] = await Promise.all([
+    prisma.invoice.aggregate({
+      _sum: { balanceDue: true },
       where: { status: { not: "PAID" } },
-      select: {
-        totalAmount: true,
-        payments: { where: { status: "RECEIVED" }, select: { amount: true } },
-      },
     }),
     prisma.purchaseInvoice.aggregate({
       _sum: { balanceDue: true },
@@ -112,12 +96,8 @@ export async function getOutstandingStats() {
     }),
   ]);
 
-  const receivables = unpaidInvoices.reduce((sum, inv) => {
-    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
-    return sum + Math.max(0, Number(inv.totalAmount) - paid);
-  }, 0);
-
-  const payables = Number(unpaidPurchases._sum.balanceDue ?? 0);
+  const receivables = Number(receivablesAgg._sum.balanceDue ?? 0);
+  const payables = Number(payablesAgg._sum.balanceDue ?? 0);
 
   return { receivables, payables };
 }
@@ -178,11 +158,7 @@ export async function getTopOutstandingParties() {
     select: {
       partyId: true,
       party: { select: { name: true } },
-      totalAmount: true,
-      payments: {
-        where: { status: "RECEIVED" },
-        select: { amount: true },
-      },
+      balanceDue: true,
     },
   });
 
@@ -190,8 +166,7 @@ export async function getTopOutstandingParties() {
 
   for (const inv of invoices) {
     if (!inv.partyId || !inv.party) continue;
-    const paid = inv.payments.reduce((s, p) => s + Number(p.amount), 0);
-    const balance = Math.max(0, Number(inv.totalAmount) - paid);
+    const balance = Math.max(0, Number(inv.balanceDue));
     const existing = partyMap.get(inv.partyId);
     if (existing) {
       existing.outstanding += balance;
@@ -260,16 +235,10 @@ export async function getInvoiceVsPayment() {
   const now = new Date();
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
-  const [invoices, payments] = await Promise.all([
-    prisma.invoice.findMany({
-      where: { date: { gte: sixMonthsAgo } },
-      select: { date: true, totalAmount: true },
-    }),
-    prisma.payment.findMany({
-      where: { date: { gte: sixMonthsAgo }, status: "RECEIVED" },
-      select: { date: true, amount: true },
-    }),
-  ]);
+  const invoices = await prisma.invoice.findMany({
+    where: { date: { gte: sixMonthsAgo } },
+    select: { date: true, totalAmount: true, paidAmount: true },
+  });
 
   const monthMap = new Map<string, { invoiced: number; collected: number }>();
   for (let i = 0; i < 6; i++) {
@@ -282,14 +251,10 @@ export async function getInvoiceVsPayment() {
     const d = new Date(inv.date);
     const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
     const entry = monthMap.get(key);
-    if (entry) entry.invoiced += Number(inv.totalAmount);
-  }
-
-  for (const pay of payments) {
-    const d = new Date(pay.date);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
-    const entry = monthMap.get(key);
-    if (entry) entry.collected += Number(pay.amount);
+    if (entry) {
+      entry.invoiced += Number(inv.totalAmount);
+      entry.collected += Number(inv.paidAmount);
+    }
   }
 
   return Array.from(monthMap.entries()).map(([month, data]) => {

@@ -9,6 +9,8 @@ export const metadata = {
     title: "Payment Sync | VyaparForge",
 };
 
+export const dynamic = "force-dynamic";
+
 async function getStats() {
     const totalCount = await prisma.paymentSync.count();
     const matchedCount = await prisma.paymentSync.count({ where: { status: "MATCHED" } });

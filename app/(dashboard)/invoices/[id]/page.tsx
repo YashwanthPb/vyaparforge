@@ -2,6 +2,12 @@ import { notFound } from "next/navigation";
 import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
   Table,
   TableHeader,
   TableBody,
@@ -58,7 +64,6 @@ function buildSellerFromProfile(profile: {
   state: string;
   stateCode: string;
 }): CompanyInfo {
-  // Derive PAN from GSTIN characters 3-12 (0-indexed: indices 2–11)
   const pan = profile.gstin.length >= 12 ? profile.gstin.substring(2, 12) : "";
 
   return {
@@ -98,28 +103,29 @@ export default async function InvoiceDetailPage({
     ? buildSellerFromProfile(companyProfile)
     : DEFAULT_SELLER;
 
-  const status = statusConfig[invoice.status];
+  const status = statusConfig[invoice.status] ?? statusConfig["UNPAID"];
   const totalPaid = invoice.payments
     .filter((p) => p.status === "RECEIVED")
     .reduce((sum, p) => sum + Number(p.amount), 0);
-  const balanceDue = Number(invoice.totalAmount) - totalPaid;
+  const balanceDue = Number(invoice.balanceDue) || (Number(invoice.totalAmount) - totalPaid);
 
   const subtotal = Number(invoice.subtotal);
   const cgst = Number(invoice.cgst);
   const sgst = Number(invoice.sgst);
   const igst = Number(invoice.igst);
   const grandTotal = Number(invoice.totalAmount);
+  const paidAmount = Number(invoice.paidAmount);
 
-  // Build buyer info from party data and defaults
+  // Build buyer info from party data
   const buyerInfo = {
     ...DEFAULT_BUYER,
     name: invoice.party?.name ?? DEFAULT_BUYER.name,
-    division: invoice.purchaseOrder?.division.name ?? "",
-    address: DEFAULT_BUYER.address,
+    division: invoice.purchaseOrder?.division?.name ?? "",
+    address: invoice.party?.address ?? DEFAULT_BUYER.address,
     city: DEFAULT_BUYER.city,
     state: DEFAULT_BUYER.state,
     stateCode: DEFAULT_BUYER.stateCode,
-    gstin: DEFAULT_BUYER.gstin,
+    gstin: invoice.party?.gstin ?? DEFAULT_BUYER.gstin,
   };
 
   // Build InvoiceData for templates
@@ -136,7 +142,7 @@ export default async function InvoiceDetailPage({
     buyer: buyerInfo,
     items: invoice.items.map((item, index) => ({
       sno: index + 1,
-      partNumber: item.poLineItem?.partNumber ?? "",
+      partNumber: item.poLineItem?.partNumber ?? item.itemName ?? "",
       description: item.poLineItem?.partName ?? item.partName ?? "",
       hsnSac: item.hsnCode ?? invoice.hsnCode ?? "7326",
       workOrder: item.poLineItem?.workOrder ?? "",
@@ -179,11 +185,163 @@ export default async function InvoiceDetailPage({
             )}
           </div>
           <p className="text-muted-foreground mt-1">
-            PO: {invoice.purchaseOrder?.poNumber ?? "N/A"} —{" "}
-            {invoice.purchaseOrder?.division.name ?? ""}
+            {invoice.purchaseOrder?.poNumber
+              ? `PO: ${invoice.purchaseOrder.poNumber}`
+              : invoice.poReference
+                ? `PO Ref: ${invoice.poReference}`
+                : ""}
+            {invoice.purchaseOrder?.division?.name
+              ? ` — ${invoice.purchaseOrder.division.name}`
+              : invoice.party?.name
+                ? ` — ${invoice.party.name}`
+                : ""}
           </p>
         </div>
         <InvoiceActions invoiceId={invoice.id} status={invoice.status} />
+      </div>
+
+      {/* Party & Reference Info Cards */}
+      <div className="grid gap-4 md:grid-cols-2 print:hidden">
+        {/* Party Details */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Party Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <p className="font-semibold text-base">{invoice.party?.name ?? "—"}</p>
+            {invoice.party?.gstin && (
+              <p><span className="text-muted-foreground">GSTIN:</span> {invoice.party.gstin}</p>
+            )}
+            {invoice.party?.address && (
+              <p><span className="text-muted-foreground">Address:</span> {invoice.party.address}</p>
+            )}
+            {invoice.party?.phone && (
+              <p><span className="text-muted-foreground">Phone:</span> {invoice.party.phone}</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Reference Details */}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Reference Details</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+              <p><span className="text-muted-foreground">DC Number:</span> {invoice.dcNumber ?? "—"}</p>
+              <p><span className="text-muted-foreground">Gate Pass:</span> {invoice.gatePassNumber ?? "—"}</p>
+              <p><span className="text-muted-foreground">Gate Pass Date:</span> {invoice.gatePassDate ? format(new Date(invoice.gatePassDate), "dd-MM-yyyy") : "—"}</p>
+              <p><span className="text-muted-foreground">PO Reference:</span> {invoice.purchaseOrder?.poNumber ?? invoice.poReference ?? "—"}</p>
+              <p><span className="text-muted-foreground">Work Order:</span> {invoice.workOrderRef ?? "—"}</p>
+              <p><span className="text-muted-foreground">Batch Number:</span> {invoice.batchNumberRef ?? "—"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Items Table (screen only) */}
+      <div className="print:hidden">
+        <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
+          Items
+        </p>
+        <div className="overflow-x-auto rounded-md border">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-12">S.No</TableHead>
+                <TableHead>Part Number</TableHead>
+                <TableHead>Description</TableHead>
+                <TableHead>HSN/SAC</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead>Unit</TableHead>
+                <TableHead className="text-right">Rate</TableHead>
+                <TableHead className="text-right">Amount</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {invoice.items.map((item, index) => (
+                <TableRow key={item.id}>
+                  <TableCell>{index + 1}</TableCell>
+                  <TableCell className="font-medium">
+                    {item.poLineItem?.partNumber ?? item.itemName ?? "—"}
+                  </TableCell>
+                  <TableCell>
+                    {item.poLineItem?.partName ?? item.partName ?? "—"}
+                  </TableCell>
+                  <TableCell>{item.hsnCode ?? invoice.hsnCode ?? "—"}</TableCell>
+                  <TableCell className="text-right">{Number(item.qty)}</TableCell>
+                  <TableCell>{item.unit ?? item.poLineItem?.unit ?? "NOS"}</TableCell>
+                  <TableCell className="text-right">{formatCurrency(Number(item.rate))}</TableCell>
+                  <TableCell className="text-right font-medium">{formatCurrency(Number(item.amount))}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Tax & Payment Summary (screen only) */}
+      <div className="grid gap-4 md:grid-cols-2 print:hidden">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Tax Summary</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span className="font-medium">{formatCurrency(subtotal)}</span>
+            </div>
+            {cgst > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">CGST</span>
+                <span>{formatCurrency(cgst)}</span>
+              </div>
+            )}
+            {sgst > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">SGST</span>
+                <span>{formatCurrency(sgst)}</span>
+              </div>
+            )}
+            {igst > 0 && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">IGST</span>
+                <span>{formatCurrency(igst)}</span>
+              </div>
+            )}
+            <Separator />
+            <div className="flex justify-between font-bold">
+              <span>Total</span>
+              <span>{formatCurrency(grandTotal)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Payment Info</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-1 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Total Amount</span>
+              <span className="font-medium">{formatCurrency(grandTotal)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Paid Amount</span>
+              <span className="font-medium text-green-600">{formatCurrency(paidAmount || totalPaid)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Balance Due</span>
+              <span className="font-medium text-red-600">{formatCurrency(balanceDue)}</span>
+            </div>
+            {invoice.paymentType && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Payment Type</span>
+                <span>{invoice.paymentType}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Themed Invoice Preview */}
@@ -194,7 +352,7 @@ export default async function InvoiceDetailPage({
         <div className="print:hidden">
           <Separator className="my-4" />
           <p className="text-muted-foreground mb-3 text-xs font-medium uppercase tracking-wider">
-            Payments
+            Payment History
           </p>
           <div className="overflow-x-auto rounded-md border">
             <Table>
@@ -223,22 +381,6 @@ export default async function InvoiceDetailPage({
                 ))}
               </TableBody>
             </Table>
-          </div>
-          <div className="mt-3 flex justify-end">
-            <div className="w-80 space-y-1 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Total Paid</span>
-                <span className="font-medium text-green-600">
-                  {formatCurrency(totalPaid)}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Balance Due</span>
-                <span className="font-medium text-red-600">
-                  {formatCurrency(balanceDue)}
-                </span>
-              </div>
-            </div>
           </div>
         </div>
       )}
